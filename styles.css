@@ -305,7 +305,16 @@ textarea { height: auto; padding: 10px 12px; resize: vertical; }
 
 /* ───────── Bets tab ───────── */
 .bets-grid { display: grid; gap: 20px; }
-@media (min-width: 980px) { .bets-grid { grid-template-columns: 380px 1fr; align-items: start; } .bets-grid > .hero { position: sticky; top: calc(var(--top-h) + 20px); } }
+.bets-grid { grid-template-columns: minmax(0, 1fr); grid-template-areas: "sweat" "hero" "drop" "main"; }
+.bets-grid > .sweat-sec { grid-area: sweat; }
+.bets-grid > .hero { grid-area: hero; }
+.bets-grid > .dropzone { grid-area: drop; margin: 0; }
+.bets-grid > .bets-main { grid-area: main; min-width: 0; }
+.sweat-sec .sec-h { margin-top: 0; }
+@media (min-width: 980px) {
+  .bets-grid { grid-template-columns: 380px minmax(0, 1fr); grid-template-areas: "hero drop" "hero sweat" "hero main" "hero ."; align-items: start; }
+  .bets-grid > .hero { position: sticky; top: calc(var(--top-h) + 20px); }
+}
 .hero { padding: 20px; overflow: hidden; position: relative; background: radial-gradient(120% 90% at 0% 0%, var(--accent-soft), transparent 60%), var(--card); }
 .hero-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
 .eyebrow { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.2em; color: var(--accent); margin-bottom: 8px; }
@@ -460,9 +469,10 @@ textarea { height: auto; padding: 10px 12px; resize: vertical; }
 }
 
 /* ───────── Build ───────── */
-.build { display: grid; gap: 20px; }
+.build { display: grid; gap: 20px; grid-template-columns: minmax(0, 1fr); }
+.build-main { min-width: 0; }
 @media (min-width: 980px) {
-  .build { grid-template-columns: 1fr 370px; align-items: start; }
+  .build { grid-template-columns: minmax(0, 1fr) 370px; align-items: start; }
   .build-slip { position: sticky; top: calc(var(--top-h) + 16px); max-height: calc(100vh - var(--top-h) - 32px); overflow: auto; }
   body[data-tab="build"] .dock { display: none !important; }
 }
@@ -783,3 +793,31 @@ code { font-size: 12.5px; background: var(--card3); padding: 1px 5px; border-rad
 .sync-banner span { flex: 1; }
 .eh-sync { display: flex; align-items: center; justify-content: center; gap: 6px; flex-wrap: wrap; margin-top: 18px; font-size: 14px; color: var(--muted); }
 .eh-sync svg { width: 18px; height: 18px; color: var(--accent); }
+
+/* ───────── polish pass ───────── */
+.dropzone.compact { padding: 10px 12px; gap: 12px; flex-wrap: nowrap; border-width: 1px; }
+.dropzone.compact .dz-ico { width: 36px; height: 36px; border-radius: 10px; }
+.dropzone.compact .dz-ico svg { width: 18px; height: 18px; }
+.dropzone.compact .dz-text { min-width: 0; }
+.dropzone.compact .dz-text b { font-size: 14.5px; }
+.dropzone.compact .dz-text span { font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dropzone.compact .btn { flex: none; }
+.gcard header { flex-wrap: nowrap; min-width: 0; }
+.gcard header .tv { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.ins th { padding-left: 8px; white-space: nowrap; }
+.ins td { padding-left: 8px; white-space: nowrap; }
+.ins td:first-child { white-space: normal; }
+@media (max-width: 859px) {
+  .tabs-add { display: none; }
+  .hide-sm { display: none; }
+  .view-h.page { margin: 4px 0 14px; }
+  .view-h.page h1 { font-size: 34px; }
+  .view-h.page p { display: none; }
+  .hero { padding: 16px; }
+  .hero .big { font-size: 38px; }
+  .chart { height: 80px; margin: 10px -16px 6px; }
+  .stats { gap: 10px 6px; }
+  body[data-tab="bets"] .view { padding-bottom: 96px; }
+  .ins { padding: 12px; }
+  .ins table { font-size: 12.5px; }
+}

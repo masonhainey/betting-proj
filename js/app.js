@@ -864,7 +864,7 @@ function viewBets() {
       <div class="eh-actions">
         <button class="btn primary" data-act="open-add">${icons.plus} Add a pick</button>
         <button class="btn" data-act="tab" data-v="build">Build a slip</button>
-        <button class="btn ghost" data-act="demo-on">Explore with demo data</button>
+        ${settings.demo ? "" : `<button class="btn ghost" data-act="demo-on">Explore with demo data</button>`}
       </div>
       ${CLOUD && !cloud.currentUser() ? `<p class="eh-sync">${icons.cloud} Already using hedgehog on another device? <button class="link" data-act="open-settings">Sign in to sync your bets</button></p>` : ""}
       ${dropZone()}
@@ -892,7 +892,7 @@ function viewBets() {
   </section>`;
 
   const sweat = sweating.length
-    ? `<section><div class="sec-h"><h2><span class="dot live"></span>Sweating now</h2><span class="muted">${sweating.length} live</span></div>
+    ? `<section class="sweat-sec"><div class="sec-h"><h2><span class="dot live"></span>Sweating now</h2><span class="muted">${sweating.length} live</span></div>
        <div class="sweat">${sweating.map(sweatCard).join("")}</div></section>`
     : "";
 
@@ -901,7 +901,7 @@ function viewBets() {
     ${chip(`Settled <em>${settled.length}</em>`, "bets-tab", "settled", S.f.betsTab === "settled")}
     ${chip("Insights", "bets-tab", "insights", S.f.betsTab === "insights")}
     <span class="grow"></span>
-    <button class="btn sm primary" data-act="open-add">${icons.plus} Add pick</button>
+    <button class="btn sm primary tabs-add" data-act="open-add">${icons.plus} Add pick</button>
   </div>`;
 
   let list;
@@ -916,7 +916,7 @@ function viewBets() {
   const syncBanner = CLOUD && !cloud.currentUser() && !settings.syncBannerDismissed
     ? `<div class="notice sync-banner">${icons.cloud}<span><b>Keep your phone and computer in sync.</b> Create a free account and your bets follow you everywhere.</span><button class="btn sm primary" data-act="open-settings">Sign in</button><button class="icon-btn sm" data-act="dismiss-sync" aria-label="Dismiss">${icons.x}</button></div>`
     : "";
-  return `${page}${syncBanner}${dropZone()}<div class="bets-grid">${hero}<div>${sweat}${tabs}${list}</div></div>`;
+  return `${page}${syncBanner}<div class="bets-grid">${sweat}${hero}${dropZone(true)}<div class="bets-main">${tabs}${list}</div></div>`;
 }
 
 function groupByDay(arr, dateFn) {
@@ -995,7 +995,7 @@ function insightsHtml() {
   const marketOf = (b) => (b.legs.length > 1 ? "Parlay" : { ml: "Moneyline", spread: "Spread", total: "Total" }[b.legs[0].market] || guessMarket(b.legs[0].pick));
   const oddsBucket = (b) => {
     const d = ticketDecimal(b);
-    return d < 1.67 ? "Heavy fav (< -150)" : d < 2.1 ? "Near even (-150 to +110)" : d < 4 ? "Plus money (+110 to +300)" : "Longshot (+300+)";
+    return d < 1.67 ? "-150 or shorter" : d < 2.1 ? "-150 to +110" : d < 4 ? "+110 to +300" : "+300 and up";
   };
   const s = summarize(bets);
   const avgOdds = bets.length ? bets.reduce((a, b) => a + ticketDecimal(b), 0) / bets.length : NaN;
@@ -1009,7 +1009,7 @@ function insightsHtml() {
     </div>
     ${table("By bet type", breakdown(bets, (b) => (b.legs.length > 1 ? "Parlay" : "Straight")))}
     ${table("By market", breakdown(bets, marketOf))}
-    ${table("By odds range", breakdown(bets, oddsBucket))}
+    ${table("By odds range", breakdown(bets, oddsBucket).sort((a, b) => ["-150 or shorter", "-150 to +110", "+110 to +300", "+300 and up"].indexOf(a.key) - ["-150 or shorter", "-150 to +110", "+110 to +300", "+300 and up"].indexOf(b.key)))}
     ${table("By book", breakdown(bets, (b) => b.book || "Unspecified"))}
   </div>`;
 }
@@ -1049,7 +1049,7 @@ function liveCard(g) {
   const mine = myActionCount(g.id);
   const sit = g.state === "in" && g.situation;
   return `<article class="gcard ${g.state} ${sit?.redZone ? "rz" : ""} ${mine ? "mine" : ""}" data-act="open-game" data-id="${g.id}" tabindex="0">
-    <header><span class="gstatus">${g.state === "in" ? `<span class="dot live"></span>` : ""}${esc(statusText(g))}</span>${g.tv ? `<span class="tv">${esc(g.tv)}</span>` : ""}<span class="grow"></span>${rankedBadge(g)}${mine ? `<span class="badge mine">${mine} bet${mine > 1 ? "s" : ""}</span>` : ""}</header>
+    <header><span class="gstatus">${g.state === "in" ? `<span class="dot live"></span>` : ""}${esc(statusText(g))}</span>${g.tv ? `<span class="tv">${esc(g.tv)}</span>` : ""}<span class="grow"></span>${rankedBadge(g, true)}${mine ? `<span class="badge mine">${mine} bet${mine > 1 ? "s" : ""}</span>` : ""}</header>
     <div class="teams">${scoreRows(g)}</div>
     ${sit ? `<div class="sit">${sit.redZone ? `<span class="badge rz">Red zone</span>` : ""}${sit.downDistance ? `<span>${esc(sit.downDistance)}</span>` : ""}${sit.lastPlay ? `<span class="lp">${esc(sit.lastPlay)}</span>` : ""}</div>` : ""}
     ${g.odds && g.state !== "post" ? `<footer class="muted">${lineSummary(g)}</footer>` : ""}
@@ -1449,7 +1449,14 @@ function hedgeText(h) {
 
 // Import a slip (screenshot / share text / link) ---------------------------
 
-function dropZone() {
+function dropZone(compact = false) {
+  if (compact) {
+    return `<section class="dropzone compact" data-act="pick-image" tabindex="0" aria-label="Import a bet slip">
+      <span class="dz-ico">${icons.upload}</span>
+      <div class="dz-text"><b>Import a bet slip</b><span>Drop or pick a screenshot, or paste share text</span></div>
+      <button class="btn sm" data-act="open-import-text" aria-label="Paste text or link">${icons.link}<span class="hide-sm">Paste</span></button>
+    </section>`;
+  }
   return `<section class="dropzone" data-act="pick-image" tabindex="0" aria-label="Import a bet slip">
     <span class="dz-ico">${icons.upload}</span>
     <div class="dz-text"><b>Drop a bet slip to track it</b><span>${matchMedia("(pointer: coarse)").matches
@@ -1662,7 +1669,7 @@ function sheetAdd() {
       <span class="swap">⇄</span>
       <label class="field"><span>To win</span><label class="stake"><span>$</span><input id="f-win" data-in="f-win" inputmode="decimal" value="${esc(f.lastEdited === "win" ? f.win : c.win ? c.win.toFixed(2) : "")}"></label></label>
     </div>
-    <label class="field"><span>Payout on your ticket <small>optional · makes hedgehog match your book to the cent</small></span><label class="stake"><span>$</span><input id="f-ticket" data-in="f-ticket" inputmode="decimal" placeholder="${c.calcPayout ? c.calcPayout.toFixed(2) : "from your book"}" value="${esc(f.ticket)}"></label></label>
+    <label class="field"><span>Ticket payout <small>optional · your book's exact number</small></span><label class="stake"><span>$</span><input id="f-ticket" data-in="f-ticket" inputmode="decimal" placeholder="${c.calcPayout ? c.calcPayout.toFixed(2) : "from your book"}" value="${esc(f.ticket)}"></label></label>
     <div id="form-calc">${formCalcHtml(c)}</div>
     <div class="money">
       <label class="field"><span>Book</span><input id="f-book" data-in="f-book" list="books" placeholder="DraftKings, FanDuel…" value="${esc(f.book)}"></label>

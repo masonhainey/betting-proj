@@ -78,7 +78,8 @@ const STAR = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5
 export const rank = (t) => (t.rank ? `<span class="rk" title="AP No. ${t.rank}">${STAR}${t.rank}</span>` : "");
 
 export const rankedMatchup = (g) => !!(g.home.rank && g.away.rank);
-export const rankedBadge = (g) => (rankedMatchup(g) ? `<span class="badge ranked">${STAR}Ranked matchup</span>` : "");
+export const rankedBadge = (g, short = false) =>
+  rankedMatchup(g) ? `<span class="badge ranked" title="Both teams ranked in the AP Top 25">${STAR}${short ? "Ranked" : "Ranked matchup"}</span>` : "";
 
 /**
  * Pregame win probability from the market: no-vig moneyline when both sides are posted,
