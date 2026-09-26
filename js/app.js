@@ -507,7 +507,7 @@ function seedDemo() {
 
 // Sync is off in demo mode (demo bets are fake) and when no Supabase project is set.
 const CLOUD = cloud.configured && !settings.demo;
-const acct = { step: "email", email: "", busy: false, error: "", status: "idle", lastSync: 0, syncError: "", firstDone: false };
+const acct = { mode: "signin", email: "", busy: false, error: "", status: "idle", lastSync: 0, syncError: "" };
 let syncMeta = load("sync", null);
 let syncTimer = null;
 let syncing = null;
@@ -575,7 +575,7 @@ async function syncNow({ announce = false } = {}) {
 cloud.onAuthChange((user) => {
   if (user) syncNow();
   else {
-    acct.step = "email";
+    acct.mode = "signin";
     acct.status = "idle";
   }
   if (S.sheet?.kind === "settings") S.sheet.dirty = true;
@@ -594,20 +594,61 @@ function accountHtml() {
   if (settings.demo) return `<div class="acct">${head("Sync across devices", "Turn off demo mode to sign in.")}</div>`;
   if (!cloud.configured) return `<div class="acct">${head("Sync across devices", "Accounts aren't connected on this site yet.")}</div>`;
   const u = cloud.currentUser();
-  if (u) {
+  if (u && acct.mode !== "newpw") {
     return `<div class="acct on">${head(esc(u.email || "Signed in"), acctStatus())}
       <div class="dactions"><button class="btn sm" data-act="sync-now" ${acct.status === "syncing" ? "disabled" : ""}>${icons.refresh} Sync now</button><span class="grow"></span><button class="btn sm ghost" data-act="sign-out">Sign out</button></div></div>`;
   }
   const err = acct.error ? `<p class="acct-err">${esc(acct.error)}</p>` : "";
-  if (acct.step === "code") {
-    return `<div class="acct">${head("Check your email", `We sent a 6-digit code to <b>${esc(acct.email)}</b>.`)}
-      <div class="acct-row"><input id="acct-code" class="acct-in code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="123456" aria-label="6-digit code">
-      <button class="btn primary" data-act="acct-verify" ${acct.busy ? "disabled" : ""}>${acct.busy ? "Checking…" : "Sign in"}</button></div>${err}
-      <p class="muted small">Wrong address? <button class="link" data-act="acct-back">Use a different email</button> · <button class="link" data-act="acct-send">Resend code</button></p></div>`;
+  const email = (auto = "email") => `<input id="acct-email" class="acct-in" type="email" inputmode="email" autocomplete="${auto}" autocapitalize="off" spellcheck="false" placeholder="you@example.com" value="${esc(acct.email)}" aria-label="Email">`;
+  const pw = (auto) => `<input id="acct-pw" class="acct-in" type="password" autocomplete="${auto}" placeholder="${auto === "new-password" ? "Choose a password (6+ characters)" : "Password"}" aria-label="Password">`;
+  const btn = (act, label, busyLabel) => `<button class="btn primary block-sm" data-act="${act}" ${acct.busy ? "disabled" : ""}>${acct.busy ? busyLabel : label}</button>`;
+  if (acct.mode === "newpw") {
+    return `<div class="acct">${head("Set a new password", "You're signed in from the reset link. Choose a new password to finish.")}
+      <div class="acct-col">${pw("new-password")}${btn("acct-newpw", "Save password", "Saving…")}</div>${err}</div>`;
   }
-  return `<div class="acct">${head("Sync your phone and computer", "Sign in with your email and your bets stay in step on every device. No password; we email you a code.")}
-    <div class="acct-row"><input id="acct-email" class="acct-in" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" value="${esc(acct.email)}" aria-label="Email">
-    <button class="btn primary" data-act="acct-send" ${acct.busy ? "disabled" : ""}>${acct.busy ? "Sending…" : "Send code"}</button></div>${err}</div>`;
+  if (acct.mode === "sent-confirm") {
+    return `<div class="acct">${head("Confirm your email", `We sent a link to <b>${esc(acct.email)}</b>. Tap it (any browser is fine), then come back and sign in.`)}
+      <p class="muted small"><button class="link" data-act="acct-mode" data-v="signin">I've confirmed, sign in</button></p></div>`;
+  }
+  if (acct.mode === "sent-reset") {
+    return `<div class="acct">${head("Check your email", `If <b>${esc(acct.email)}</b> has an account, a reset link is on its way. Open it to choose a new password.`)}
+      <p class="muted small"><button class="link" data-act="acct-mode" data-v="signin">Back to sign in</button></p></div>`;
+  }
+  if (acct.mode === "forgot") {
+    return `<div class="acct">${head("Reset your password", "We'll email you a link to set a new one.")}
+      <div class="acct-col">${email()}${btn("acct-reset", "Send reset link", "Sending…")}</div>${err}
+      <p class="muted small"><button class="link" data-act="acct-mode" data-v="signin">Back to sign in</button></p></div>`;
+  }
+  const signup = acct.mode === "signup";
+  return `<div class="acct">${head(signup ? "Create your account" : "Sync your phone and computer", signup ? "One account keeps your bets in step on every device." : "Sign in and your bets stay in step on every device.")}
+    <div class="seg acct-tabs"><button class="${signup ? "" : "on"}" data-act="acct-mode" data-v="signin">Sign in</button><button class="${signup ? "on" : ""}" data-act="acct-mode" data-v="signup">Create account</button></div>
+    <form class="acct-col" data-form="acct" onsubmit="return false">${email(signup ? "email" : "username")}${pw(signup ? "new-password" : "current-password")}
+    ${btn(signup ? "acct-signup" : "acct-signin", signup ? "Create account" : "Sign in", signup ? "Creating…" : "Signing in…")}</form>${err}
+    ${signup ? "" : `<p class="muted small"><button class="link" data-act="acct-mode" data-v="forgot">Forgot password?</button></p>`}</div>`;
+}
+
+async function acctSubmit(fn, { needPw = true } = {}) {
+  const email = ($("#acct-email")?.value ?? acct.email).trim();
+  const pw = $("#acct-pw")?.value || "";
+  acct.email = email;
+  if (!/^\S+@\S+\.\S+$/.test(email)) {
+    acct.error = "Enter your email address.";
+    return paintAcct();
+  }
+  if (needPw && pw.length < 6) {
+    acct.error = acct.mode === "signup" ? "Use a password with at least 6 characters." : "Enter your password.";
+    return paintAcct();
+  }
+  acct.busy = true;
+  acct.error = "";
+  paintAcct();
+  try {
+    await fn(email, pw);
+  } catch (e) {
+    acct.error = e.message;
+  }
+  acct.busy = false;
+  paintAcct();
 }
 
 function paintAcct() {
@@ -873,7 +914,7 @@ function viewBets() {
   }
   const page = `<div class="view-h page"><div><div class="eyebrow">Game day workspace</div><h1>College football</h1><p class="muted">Track straight bets and parlays alongside live scores.</p></div></div>`;
   const syncBanner = CLOUD && !cloud.currentUser() && !settings.syncBannerDismissed
-    ? `<div class="notice sync-banner">${icons.cloud}<span><b>Keep your phone and computer in sync.</b> Sign in with your email; your bets follow you everywhere.</span><button class="btn sm primary" data-act="open-settings">Sign in</button><button class="icon-btn sm" data-act="dismiss-sync" aria-label="Dismiss">${icons.x}</button></div>`
+    ? `<div class="notice sync-banner">${icons.cloud}<span><b>Keep your phone and computer in sync.</b> Create a free account and your bets follow you everywhere.</span><button class="btn sm primary" data-act="open-settings">Sign in</button><button class="icon-btn sm" data-act="dismiss-sync" aria-label="Dismiss">${icons.x}</button></div>`
     : "";
   return `${page}${syncBanner}${dropZone()}<div class="bets-grid">${hero}<div>${sweat}${tabs}${list}</div></div>`;
 }
@@ -2060,48 +2101,45 @@ const actions = {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   },
-  "acct-send": async () => {
-    const email = ($("#acct-email")?.value ?? acct.email).trim();
-    if (!/^\S+@\S+\.\S+$/.test(email)) {
-      acct.error = "Enter your email address";
+  "acct-mode": (el) => {
+    acct.email = ($("#acct-email")?.value ?? acct.email).trim();
+    acct.mode = el.dataset.v;
+    acct.error = "";
+    paintAcct();
+    setTimeout(() => $(acct.email ? "#acct-pw" : "#acct-email")?.focus(), 30);
+  },
+  "acct-signin": () => acctSubmit(async (email, pw) => {
+    await cloud.signIn(email, pw);
+    toast("Signed in. Syncing your bets…", "won");
+  }),
+  "acct-signup": () => acctSubmit(async (email, pw) => {
+    const r = await cloud.signUp(email, pw);
+    if (r.signedIn) toast("Account created. Syncing your bets…", "won");
+    else acct.mode = "sent-confirm";
+  }),
+  "acct-reset": () => acctSubmit(async (email) => {
+    await cloud.resetPassword(email);
+    acct.mode = "sent-reset";
+  }, { needPw: false }),
+  "acct-newpw": async () => {
+    const pw = $("#acct-pw")?.value || "";
+    if (pw.length < 6) {
+      acct.error = "Use a password with at least 6 characters.";
       return paintAcct();
     }
-    acct.email = email;
     acct.busy = true;
     acct.error = "";
     paintAcct();
     try {
-      await cloud.sendCode(email);
-      acct.step = "code";
+      await cloud.updatePassword(pw);
+      acct.mode = "signin";
+      toast("Password updated", "won");
+      if (S.sheet?.kind === "settings") S.sheet.dirty = true;
+      render();
     } catch (e) {
       acct.error = e.message;
     }
     acct.busy = false;
-    paintAcct();
-    setTimeout(() => $("#acct-code")?.focus(), 30);
-  },
-  "acct-verify": async () => {
-    const code = ($("#acct-code")?.value || "").replace(/\D/g, "");
-    if (code.length < 6) {
-      acct.error = "Enter the 6-digit code from the email";
-      return paintAcct();
-    }
-    acct.busy = true;
-    acct.error = "";
-    paintAcct();
-    try {
-      await cloud.verifyCode(acct.email, code);
-      acct.step = "email";
-      toast("Signed in. Syncing your bets…", "won");
-    } catch (e) {
-      acct.error = e.message;
-    }
-    acct.busy = false;
-    paintAcct();
-  },
-  "acct-back": () => {
-    acct.step = "email";
-    acct.error = "";
     paintAcct();
   },
   "sync-now": () => syncNow({ announce: true }),
@@ -2290,9 +2328,10 @@ document.addEventListener("input", (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
-  if (e.key === "Enter" && (e.target.id === "acct-email" || e.target.id === "acct-code")) {
+  if (e.key === "Enter" && (e.target.id === "acct-email" || e.target.id === "acct-pw")) {
     e.preventDefault();
-    actions[e.target.id === "acct-email" ? "acct-send" : "acct-verify"]();
+    const act = { signin: "acct-signin", signup: "acct-signup", forgot: "acct-reset", newpw: "acct-newpw" }[acct.mode];
+    if (act) actions[act]();
   }
   if (e.key === "Escape" && S.sheet) {
     S.sheet = null;
@@ -2383,7 +2422,22 @@ document.addEventListener("paste", (e) => {
   }
 });
 
+/** Sign-up confirmation / password-reset links land here with tokens in the URL hash. */
+function handleAuthLink() {
+  if (!CLOUD || !/access_token=|error_description=/.test(location.hash)) return false;
+  cloud.sessionFromUrl().then((kind) => {
+    if (kind === "recovery") {
+      acct.mode = "newpw";
+      openSheet({ kind: "settings" });
+      setTimeout(() => $("#acct-pw")?.focus(), 60);
+    } else if (kind === "signup") toast("Email confirmed. You're signed in and syncing.", "won");
+    else if (kind) toast("Signed in. Syncing your bets…", "won");
+  }).catch((e) => toast(e.message, "err"));
+  return true;
+}
+
 window.addEventListener("hashchange", () => {
+  if (handleAuthLink()) return;
   const t = location.hash.slice(1);
   if (TABS.includes(t)) {
     S.tab = t;
@@ -2423,7 +2477,7 @@ function boot() {
   loadCache();
   render();
   if (CLOUD) {
-    cloud.sessionFromUrl().then((did) => did && toast("Signed in. Syncing your bets…", "won")).catch((e) => toast(e.message, "err"));
+    handleAuthLink();
     if (cloud.currentUser()) syncNow();
   }
   tick(true);

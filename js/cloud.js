@@ -1,6 +1,7 @@
 // Accounts and storage on Supabase, over plain fetch (no SDK to download).
-// Auth: email one-time code — works inside an iPhone home-screen app, where a magic link
-// would open Safari instead. Magic links still work when opened in the same browser.
+// Auth: email + password. It works the same inside an iPhone home-screen app (where an
+// emailed link would open Safari instead) and needs no custom email setup. Email is only
+// used for the optional sign-up confirmation and for password resets.
 
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "./config.js";
 import { load, save, remove } from "./store.js";
@@ -66,7 +67,12 @@ async function request(path, { method = "GET", body, headers = {}, token } = {})
 }
 
 function friendly(status, msg) {
-  if (/expired|invalid.*(otp|token)|token.*(expired|invalid)/i.test(msg)) return "That code is wrong or expired. Request a new one.";
+  if (/invalid login credentials/i.test(msg)) return "Wrong email or password.";
+  if (/email not confirmed/i.test(msg)) return "Confirm your email first: tap the link in the email from Supabase, then sign in here.";
+  if (/already (been )?registered|already exists/i.test(msg)) return "There's already an account with that email. Sign in instead.";
+  if (/password.*(at least|short|characters)/i.test(msg)) return "Use a password with at least 6 characters.";
+  if (/same.*password|different from the old/i.test(msg)) return "Pick a password you haven't used before.";
+  if (/expired|invalid.*(otp|token)|token.*(expired|invalid)/i.test(msg)) return "That link expired. Request a new one.";
   if (status === 429 || /rate limit/i.test(msg)) return "Too many emails. Wait a minute and try again.";
   if (/email.*(invalid|valid)/i.test(msg)) return "That email address doesn't look right.";
   return msg || `Sync error (${status})`;
@@ -113,15 +119,35 @@ async function authed(path, opts = {}) {
   }
 }
 
-export async function sendCode(email) {
-  await request("/auth/v1/otp", { method: "POST", body: { email: email.trim(), create_user: true } });
+const appUrl = () => location.origin + location.pathname;
+
+/** Create an account. Returns { signedIn } — false when Supabase wants the email confirmed first. */
+export async function signUp(email, password) {
+  const r = await request(`/auth/v1/signup?redirect_to=${encodeURIComponent(appUrl())}`, { method: "POST", body: { email: email.trim(), password } });
+  if (r?.access_token) {
+    setSession(r);
+    return { signedIn: true };
+  }
+  return { signedIn: false };
 }
 
-export async function verifyCode(email, code) {
-  setSession(await request("/auth/v1/verify", { method: "POST", body: { type: "email", email: email.trim(), token: code.replace(/\s/g, "") } }));
+export async function signIn(email, password) {
+  setSession(await request("/auth/v1/token?grant_type=password", { method: "POST", body: { email: email.trim(), password } }));
 }
 
-/** Finish a magic-link sign-in if the page was opened from one. Returns true if it did. */
+/** Email a password-reset link that comes back to this app. */
+export async function resetPassword(email) {
+  await request(`/auth/v1/recover?redirect_to=${encodeURIComponent(appUrl())}`, { method: "POST", body: { email: email.trim() } });
+}
+
+export async function updatePassword(password) {
+  await authed("/auth/v1/user", { method: "PUT", body: { password } });
+}
+
+/**
+ * Finish sign-in when the page was opened from an emailed link (sign-up confirmation or
+ * password reset). Returns false, "signup", "recovery" or "magiclink".
+ */
 export async function sessionFromUrl() {
   const h = new URLSearchParams(location.hash.slice(1));
   if (h.get("error_description")) {
@@ -133,7 +159,7 @@ export async function sessionFromUrl() {
   history.replaceState(null, "", location.pathname + location.search + "#bets");
   const user = await request("/auth/v1/user", { token: at });
   setSession({ access_token: at, refresh_token: h.get("refresh_token"), expires_in: Number(h.get("expires_in")) || 3600, user });
-  return true;
+  return h.get("type") || "magiclink";
 }
 
 export async function signOut() {
