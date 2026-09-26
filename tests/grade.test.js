@@ -81,3 +81,13 @@ test("summary math", () => {
   assert.equal(s.potential, 15);
   assert.equal(s.streak, "L1");
 });
+
+test("ticket payout overrides leg math until a leg pushes", async () => {
+  const { ticketDecimal, computedDecimal } = await import("../js/grade.js");
+  const b = { stake: 20, ticketPayout: 193.4, legs: [leg({ status: "won", odds: 2 }), leg({ status: "won", odds: 5 })] };
+  assert.equal(computedDecimal(b), 10);
+  assert.equal(ticketDecimal(b), 9.67);
+  assert.ok(Math.abs(betProfit(b) - 173.4) < 1e-9);
+  b.legs[0].status = "push";
+  assert.equal(betProfit(b), 80, "after a push the book reprices from the remaining legs");
+});

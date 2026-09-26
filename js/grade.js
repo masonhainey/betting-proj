@@ -15,11 +15,16 @@ export function legDecimal(leg) {
   return leg.status === "push" || leg.status === "void" ? 1 : leg.odds;
 }
 
+/** The payout printed on the ticket, if the user entered one. It beats any math we do. */
+const ticketOdds = (bet) => (bet.ticketPayout > 0 && bet.stake > 0 ? bet.ticketPayout / bet.stake : null);
+
 /** Decimal odds the bet pays at, accounting for pushed legs and the book's own parlay price. */
 export function betDecimal(bet) {
   const live = bet.legs.filter((l) => l.status !== "push" && l.status !== "void");
+  const full = live.length === bet.legs.length;
+  if (full && ticketOdds(bet)) return ticketOdds(bet);
   let d;
-  if (bet.oddsOverride > 1 && live.length === bet.legs.length) d = bet.oddsOverride;
+  if (bet.oddsOverride > 1 && full) d = bet.oddsOverride;
   else d = parlayDecimal(bet.legs.map(legDecimal));
   if (bet.boostPct > 0 && d > 1) d = 1 + (d - 1) * (1 + bet.boostPct / 100);
   return d;
@@ -27,6 +32,12 @@ export function betDecimal(bet) {
 
 /** Odds at time of placement, ignoring later pushes — what the ticket said. */
 export function ticketDecimal(bet) {
+  if (ticketOdds(bet)) return ticketOdds(bet);
+  return computedDecimal(bet);
+}
+
+/** What the legs (plus any book price / boost) multiply out to, ignoring an entered ticket payout. */
+export function computedDecimal(bet) {
   let d = bet.oddsOverride > 1 ? bet.oddsOverride : parlayDecimal(bet.legs.map((l) => l.odds));
   if (bet.boostPct > 0 && d > 1) d = 1 + (d - 1) * (1 + bet.boostPct / 100);
   return d;

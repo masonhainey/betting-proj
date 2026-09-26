@@ -7,8 +7,10 @@ import {
 } from "./odds.js";
 import {
   betStatus, betProfit, betDecimal, ticketDecimal, potentialPayout, legLive, legLabel,
-  autoGrade, summarize, breakdown, SETTLED,
+  autoGrade, summarize, breakdown, SETTLED, computedDecimal,
 } from "./grade.js";
+import { parseSlipText, linkPick } from "./slipparse.js";
+import { readImage } from "./ocr.js";
 import { load, save, uid, DEFAULT_SETTINGS } from "./store.js";
 import { TAGS, tagArticle, mentionsTeam } from "./news.js";
 import {
@@ -365,6 +367,9 @@ function slipCalc() {
   let d = override > 1 ? override : pd;
   if (boost > 0) d = 1 + (d - 1) * (1 + boost / 100);
   const stake = num(S.slip.stake);
+  const calcPayout = stake > 0 ? stake * d : 0;
+  const ticket = num(S.slip.ticket);
+  if (ticket > 0 && stake > 0) d = ticket / stake;
   const singles = legs.map((l) => {
     const st = num(S.slip.stakes[l.id] ?? "");
     return { id: l.id, stake: st, win: toWin(st, l.odds) };
@@ -380,6 +385,8 @@ function slipCalc() {
     stake,
     win: toWin(stake, d),
     payout: stake > 0 ? stake * d : 0,
+    calcPayout,
+    ticket,
     prob: impliedProb(pd),
     singles,
     singlesRisk: singles.reduce((s, x) => s + x.stake, 0),
@@ -403,7 +410,7 @@ function trackSlip() {
     if (c.conflict) return toast("Two legs on the same market of one game can't be parlayed", "err");
     if (!(c.stake > 0)) return toast("Enter a stake", "err");
     const override = parseOdds(S.slip.override)?.decimal;
-    S.bets.unshift({ id: uid(), createdAt: now, type: "parlay", stake: c.stake, book, legs: c.legs.map(mkLeg), oddsOverride: override > 1 ? override : null, boostPct: num(S.slip.boost) || 0 });
+    S.bets.unshift({ id: uid(), createdAt: now, type: "parlay", stake: c.stake, book, legs: c.legs.map(mkLeg), oddsOverride: override > 1 ? override : null, boostPct: num(S.slip.boost) || 0, ...(c.ticket > 0 ? { ticketPayout: c.ticket } : {}) });
     added = 1;
   } else {
     for (const l of c.legs) {
@@ -416,7 +423,7 @@ function trackSlip() {
   }
   if (book) settings.lastBook = book, saveSettings();
   saveBets();
-  S.slip = { mode: S.slip.mode, legs: [], stakes: {}, stake: settings.unit, override: "", boost: "", book };
+  S.slip = { mode: S.slip.mode, legs: [], stakes: {}, stake: settings.unit, override: "", boost: "", ticket: "", book };
   saveSlip();
   if (S.sheet?.kind === "slip") S.sheet = null;
   toast(added > 1 ? `Tracking ${added} bets` : "Bet tracked — it's on your Bets tab", "won");
@@ -530,9 +537,9 @@ function renderSheet() {
   }
   const k = S.sheet.kind;
   // Forms render once and update in place; live sheets re-render every refresh.
-  if (root.dataset.kind === k && root.dataset.key === (S.sheet.id || "") && (k === "add" || k === "settings") && !S.sheet.dirty) return;
+  if (root.dataset.kind === k && root.dataset.key === (S.sheet.id || "") && (k === "add" || k === "settings" || k === "import") && !S.sheet.dirty) return;
   S.sheet.dirty = false;
-  const body = { add: sheetAdd, bet: sheetBet, game: sheetGame, settings: sheetSettings, slip: () => `<div class="sheet-h"><h2>Bet slip</h2>${closeBtn()}</div>${slipHtml()}` }[k]();
+  const body = { add: sheetAdd, bet: sheetBet, game: sheetGame, settings: sheetSettings, import: sheetImport, slip: () => `<div class="sheet-h"><h2>Bet slip</h2>${closeBtn()}</div>${slipHtml()}` }[k]();
   root.dataset.kind = k;
   root.dataset.key = S.sheet.id || "";
   if (root.hidden) {
@@ -697,6 +704,7 @@ function viewBets() {
         <button class="btn" data-act="tab" data-v="build">Build a slip</button>
         <button class="btn ghost" data-act="demo-on">Explore with demo data</button>
       </div>
+      ${dropZone()}
     </section>`;
   }
 
@@ -742,7 +750,7 @@ function viewBets() {
       : `<div class="empty">${S.f.betsTab === "open" ? "No open bets. Tap <b>Add pick</b> or build a slip." : "Nothing settled yet."}</div>`;
   }
   const page = `<div class="view-h page"><div><div class="eyebrow">Game day workspace</div><h1>College football</h1><p class="muted">Track straight bets and parlays alongside live scores.</p></div></div>`;
-  return `${page}<div class="bets-grid">${hero}<div>${sweat}${tabs}${list}</div></div>`;
+  return `${page}${dropZone()}<div class="bets-grid">${hero}<div>${sweat}${tabs}${list}</div></div>`;
 }
 
 function groupByDay(arr, dateFn) {
@@ -1041,6 +1049,7 @@ function slipHtml() {
         <div class="prow"><label>Profit boost</label><label class="stake pct"><input id="slip-boost" data-in="slip-boost" inputmode="decimal" placeholder="0" value="${esc(S.slip.boost)}"><span>%</span></label></div>
         <div class="prow"><label>Stake</label><label class="stake"><span>$</span><input id="slip-stake" data-in="slip-pstake" inputmode="decimal" value="${esc(S.slip.stake)}"></label></div>
         <div class="quick">${[5, 10, 25, 50, 100].map((v) => `<button class="chip" data-act="slip-quick" data-v="${v}">$${v}</button>`).join("")}</div>
+        <div class="prow"><label>Payout on your ticket <small>after you place it — we'll match it exactly</small></label><label class="stake"><span>$</span><input id="slip-ticket" data-in="slip-ticket" inputmode="decimal" placeholder="${c.calcPayout ? c.calcPayout.toFixed(2) : ""}" value="${esc(S.slip.ticket || "")}"></label></div>
       </div>`
     : "";
   return `<div class="slip">
@@ -1061,13 +1070,21 @@ function towinText(l) {
   return st > 0 ? `To win <b>${fmtMoney(toWin(st, l.odds))}</b>` : `$${settings.unit} wins ${fmtMoney(toWin(settings.unit, l.odds))}`;
 }
 
+/** Explains why a book's ticket payout differs from multiplying the leg prices. */
+function mismatchNote(ticket, calc) {
+  if (!(ticket > 0) || !(calc > 0)) return "";
+  const diff = ticket - calc;
+  if (Math.abs(diff) < 0.01) return `<div class="match ok">✓ Matches your ticket to the cent</div>`;
+  return `<div class="match">Using your ticket's <b>${fmtMoney(ticket)}</b>. The leg prices multiply to ${fmtMoney(calc)} (${fmtMoney(diff, { sign: true })}) — books round each leg's price, price same-game parlays with their own correlation math, and prices can move between building a slip and placing it.</div>`;
+}
+
 function slipSummary(c) {
   if (S.slip.mode === "parlay") {
     return `<div class="summary">
       <div><span>Odds</span><b class="odds-big">${odds(c.parlayOdds)}</b><small>${fmt() === "american" ? `${formatOdds(c.parlayOdds, "decimal")}×` : formatOdds(c.parlayOdds, "american")}</small></div>
       <div><span>Hit chance</span><b>${fmtPct(c.prob)}</b><small>implied, with vig</small></div>
       <div><span>To win</span><b class="pos">${fmtMoney(c.win)}</b><small>payout ${fmtMoney(c.payout)}</small></div>
-    </div>`;
+    </div>${mismatchNote(c.ticket, c.calcPayout)}`;
   }
   return `<div class="summary">
     <div><span>Total risk</span><b>${fmtMoney(c.singlesRisk)}</b></div>
@@ -1232,7 +1249,7 @@ function sheetBet() {
       ${pill(st)}<span class="muted">${esc(b.book || "No book")} · placed ${esc(fmtDayTime(b.createdAt))}</span>
     </div>
     <div class="dsum">
-      <div><span>Odds</span><b>${odds(ticketDecimal(b))}</b>${b.oddsOverride ? `<small>book price</small>` : ""}${b.boostPct ? `<small>+${b.boostPct}% boost</small>` : ""}</div>
+      <div><span>Odds</span><b>${odds(ticketDecimal(b))}</b>${b.ticketPayout ? `<small>from ticket</small>` : b.oddsOverride ? `<small>book price</small>` : ""}${b.boostPct ? `<small>+${b.boostPct}% boost</small>` : ""}</div>
       <div><span>Risk</span><b>${fmtMoney(b.stake)}</b></div>
       <div><span>${st === "open" ? "Payout" : "Result"}</span><b class="${profit > 0 ? "pos" : profit < 0 ? "neg" : ""}">${st === "open" ? fmtMoney(payout) : fmtMoney(profit, { sign: true })}</b>${st === "open" ? `<small>profit ${fmtMoney(payout - b.stake)}</small>` : ""}</div>
     </div>
@@ -1242,6 +1259,9 @@ function sheetBet() {
       ${b.cashout != null
         ? `<p>Cashed out for <b>${fmtMoney(b.cashout)}</b> (${fmtMoney(b.cashout - b.stake, { sign: true })}). <button class="link" data-act="undo-cashout" data-id="${b.id}">Undo</button></p>`
         : `<div class="row-inline"><label class="stake"><span>$</span><input id="cashout-amt" inputmode="decimal" placeholder="Offer from your book"></label><button class="btn sm" data-act="cashout" data-id="${b.id}">Cash out</button></div>`}` : ""}
+    ${b.cashout == null ? `<h3 class="sh3">Payout on your ticket <small>set it if our number doesn't match your book</small></h3>
+      <div class="row-inline"><label class="stake"><span>$</span><input id="ticket-amt" inputmode="decimal" value="${b.ticketPayout ? b.ticketPayout.toFixed(2) : ""}" placeholder="${(b.stake * computedDecimal(b)).toFixed(2)}"></label><button class="btn sm" data-act="set-ticket" data-id="${b.id}">${b.ticketPayout ? "Update" : "Save"}</button>${b.ticketPayout ? `<button class="link" data-act="clear-ticket" data-id="${b.id}">Use leg math</button>` : ""}</div>
+      ${b.ticketPayout ? mismatchNote(b.ticketPayout, b.stake * computedDecimal(b)) : ""}` : ""}
     ${st === "open" ? `<h3 class="sh3">Hedge calculator</h3>
       <p class="muted small">Price on the other side at your book → how much to bet to lock the same result either way.</p>
       <div class="row-inline"><label class="stake odds"><input id="hedge-odds" data-in="hedge" value="${esc(S.sheet.hedge || "")}" placeholder="e.g. +250 or 3.5"></label>
@@ -1249,6 +1269,7 @@ function sheetBet() {
     <h3 class="sh3">Notes</h3>
     <textarea id="bet-note" data-in="bet-note" data-id="${b.id}" rows="2" placeholder="Why you liked it, who tipped you, etc.">${esc(b.note || "")}</textarea>
     <div class="dactions">
+      ${b.link ? `<a class="btn sm" href="${esc(b.link)}" target="_blank" rel="noopener">${icons.ext} Open on ${esc(b.book || "your book")}</a>` : ""}
       ${b.legs.some((l) => l.gameId) ? `<button class="btn sm" data-act="rebuild" data-id="${b.id}">Rebuild in slip</button>` : ""}
       <span class="grow"></span>
       <button class="btn sm danger" data-act="delete-bet" data-id="${b.id}">${S.confirmDelete === b.id ? "Tap again to delete" : "Delete"}</button>
@@ -1258,6 +1279,128 @@ function sheetBet() {
 function hedgeText(h) {
   if (!h) return `<span class="muted">Enter the opposing price</span>`;
   return `Bet <b>${fmtMoney(h.stake)}</b> → lock <b class="${h.locked >= 0 ? "pos" : "neg"}">${fmtMoney(h.locked, { sign: true })}</b> either way`;
+}
+
+// Import a slip (screenshot / share text / link) ---------------------------
+
+function dropZone() {
+  return `<section class="dropzone" data-act="pick-image" tabindex="0" aria-label="Import a bet slip">
+    <span class="dz-ico">${icons.upload}</span>
+    <div class="dz-text"><b>Drop a bet slip to track it</b><span>${matchMedia("(pointer: coarse)").matches
+      ? "Pick a screenshot from your photos, or paste the share text your book gives you."
+      : `Screenshot from any book. You can also paste an image (${/Mac|iPhone|iPad/.test(navigator.platform) ? "⌘" : "Ctrl+"}V) or paste a share link or the share text.`}</span></div>
+    <div class="dz-actions"><button class="btn sm primary" data-act="pick-image">${icons.upload} Choose screenshot</button><button class="btn sm" data-act="open-import-text">${icons.link} Paste text or link</button></div>
+  </section>`;
+}
+
+/** Games a pasted bet could reasonably be on: recent finals through the next month. */
+function linkPool() {
+  const now = Date.now();
+  return [...S.games.values()].filter((g) => new Date(g.date) > now - 4 * 864e5 && new Date(g.date) < now + 30 * 864e5);
+}
+
+async function handleImage(file) {
+  if (!file || !/^image\//.test(file.type)) return toast("Drop an image of your bet slip (PNG or JPG)", "err");
+  if (S.imp?.img) URL.revokeObjectURL(S.imp.img);
+  S.imp = { busy: true, stage: "Loading reader", progress: 0, img: URL.createObjectURL(file), text: "", parsed: null, error: "" };
+  openSheet({ kind: "import" });
+  try {
+    const text = await readImage(file, (stage, p) => {
+      S.imp.stage = stage;
+      S.imp.progress = p;
+      paintImportProgress();
+    });
+    S.imp.text = text.replace(/\n{3,}/g, "\n\n").trim();
+    S.imp.parsed = parseSlipText(S.imp.text);
+  } catch (e) {
+    S.imp.error = e.message || "Couldn't read that image";
+  }
+  S.imp.busy = false;
+  if (S.sheet?.kind === "import") {
+    S.sheet.dirty = true;
+    render();
+  }
+}
+
+function handleText(text) {
+  S.imp = { busy: false, text: text.trim(), parsed: text.trim() ? parseSlipText(text) : null, error: "" };
+  openSheet({ kind: "import" });
+  if (!text.trim()) setTimeout(() => $("#imp-text")?.focus(), 40);
+}
+
+function paintImportProgress() {
+  const bar = $("#imp-bar");
+  if (bar) bar.style.width = `${Math.round((S.imp.progress || 0) * 100)}%`;
+  const st = $("#imp-stage");
+  if (st) st.textContent = `${S.imp.stage}…`;
+}
+
+function importPreview() {
+  const p = S.imp.parsed;
+  if (!p) return `<p class="muted small">Nothing to read yet.</p>`;
+  const pool = linkPool();
+  const linkOnly = p.url && !p.legs.length && p.stake == null;
+  const rows = p.legs.map((l) => {
+    const m = linkPick(l.pick, pool);
+    const g = m && game(m.gameId);
+    return `<div class="ip-leg"><span class="ldot"></span><div class="lmain"><div class="lpick">${esc(l.pick)}</div>${g ? `<div class="lmeta">${logo(g.away, 16)}${logo(g.home, 16)} ${esc(g.shortName)} · ${esc(relDay(g.date))}${m.market !== "other" ? " · tracks live" : ""}</div>` : `<div class="lmeta">No game match: it'll be tracked manually</div>`}</div><span class="lodds">${odds(l.odds)}</span></div>`;
+  }).join("");
+  return `<div class="ip-sum">
+      ${p.book ? `<span class="pill open">${esc(p.book)}</span>` : ""}
+      <span class="pill ${p.legs.length ? "won" : ""}">${p.legs.length ? `${p.legs.length} ${p.legs.length > 1 ? "legs" : "leg"}${p.legCount && p.legCount !== p.legs.length ? ` of ${p.legCount}` : ""}` : "No legs found"}</span>
+      ${p.stake != null ? `<span>${fmtMoney(p.stake)} → <b>${p.payout != null ? fmtMoney(p.payout) : "?"}</b></span>` : ""}
+    </div>
+    ${rows ? `<div class="ip-legs">${rows}</div>` : ""}
+    ${linkOnly ? `<div class="notice warn">${icons.link}<span>Sportsbook share links open inside the book's app and need your login, so hedgehog can't read them. Paste the share text that came with the link, or drop a screenshot. The link will still be saved on the bet.</span></div>` : ""}
+    ${!p.legs.length && !linkOnly ? `<p class="muted small">Couldn't find picks with odds. Fix the text above (one pick per line, like <code>Georgia -7.5 -110</code>) or continue and fill the form in by hand.</p>` : ""}`;
+}
+
+function sheetImport() {
+  const I = S.imp || {};
+  return `<div class="sheet-h"><h2>Import a bet slip</h2>${closeBtn()}</div>
+    ${I.img ? `<div class="imp-img"><img src="${esc(I.img)}" alt="Your bet slip"></div>` : ""}
+    ${I.busy
+      ? `<div class="imp-prog"><div class="imp-track"><i id="imp-bar" style="width:${Math.round((I.progress || 0) * 100)}%"></i></div><span id="imp-stage" class="muted small">${esc(I.stage || "Working")}…</span>
+         <p class="muted small">The first import downloads a text reader (~12 MB, one time). Your screenshot is read in your browser and isn't uploaded anywhere.</p></div>`
+      : `${I.error ? `<div class="notice err">${esc(I.error)}. You can still paste the text below.</div>` : ""}
+         <label class="field"><span>${I.img ? "What we read" : "Share text or link"} <small>edit anything that looks off</small></span>
+         <textarea id="imp-text" data-in="imp-text" rows="${I.img ? 7 : 6}" placeholder="Paste the text your book shares, e.g.\n4 Leg Parlay +867\nTexas -7.5 -110\n…\nWager $20.00  To Pay $193.40">${esc(I.text || "")}</textarea></label>
+         <div id="imp-preview">${importPreview()}</div>
+         <button class="btn primary block" data-act="imp-continue">Review & track</button>`}`;
+}
+
+function openDraft() {
+  const p = S.imp?.parsed || parseSlipText(S.imp?.text || "");
+  const pool = linkPool();
+  let linked = 0;
+  const legs = p.legs.map((l) => {
+    const leg = newFormLeg({ pick: l.pick, odds: l.odds, oddsText: formatOdds(l.odds, fmt()) });
+    const m = linkPick(l.pick, pool);
+    if (m) {
+      const g = game(m.gameId);
+      Object.assign(leg, m, { gameLabel: g.shortName, kickoff: g.date });
+      if (m.market !== "other") linked++;
+    }
+    return leg;
+  });
+  const missing = p.legCount && p.legCount > legs.length ? p.legCount - legs.length : 0;
+  for (let i = 0; i < missing; i++) legs.push(newFormLeg());
+  const type = legs.length > 1 || p.type === "parlay" ? "parlay" : "straight";
+  if (!legs.length) legs.push(newFormLeg());
+  if (type === "parlay" && legs.length < 2) legs.push(newFormLeg());
+  openAdd();
+  Object.assign(S.form, {
+    type,
+    legs,
+    stake: p.stake != null ? String(p.stake) : S.form.stake,
+    ticket: p.payout != null ? p.payout.toFixed(2) : "",
+    book: p.book || S.form.book,
+    link: p.url || "",
+    override: p.payout == null && p.totalOdds && type === "parlay" ? formatOdds(p.totalOdds, fmt()) : "",
+    source: { img: S.imp?.img, missing, linked },
+  });
+  S.sheet.dirty = true;
+  render();
 }
 
 // Add-a-pick form ---------------------------------------------------------
@@ -1278,9 +1421,12 @@ function openAdd(prefill) {
     boost: "",
     book: settings.lastBook || "",
     note: "",
-    linking: prefill?.gameId ? null : null,
+    linking: null,
     q: "",
     linkGame: null,
+    ticket: "",
+    link: "",
+    source: null,
   };
   if (prefill?.gameId) {
     S.form.linking = S.form.legs[0].id;
@@ -1296,12 +1442,16 @@ function formCalc() {
   const valid = legs.every((l) => l.odds > 1);
   const calc = parlayDecimal(legs.map((l) => l.odds));
   const override = f.type === "parlay" ? parseOdds(f.override)?.decimal : null;
-  let d = override > 1 ? override : calc;
+  let dCalc = override > 1 ? override : calc;
   const boost = num(f.boost);
-  if (boost > 0) d = 1 + (d - 1) * (1 + boost / 100);
+  if (boost > 0) dCalc = 1 + (dCalc - 1) * (1 + boost / 100);
+  let d = dCalc;
   let stake = num(f.stake);
   if (f.lastEdited === "win") stake = stakeForWin(num(f.win), d);
-  return { legs, valid, calc, d, stake, win: toWin(stake, d), payout: stake * d, prob: impliedProb(d) };
+  const ticket = num(f.ticket);
+  // The payout printed on the ticket is the truth; derive the effective odds from it.
+  if (ticket > 0 && stake > 0 && f.lastEdited !== "win") d = ticket / stake;
+  return { legs, valid: valid || ticket > 0, calc, d, stake, win: toWin(stake, d), payout: stake * d, calcPayout: valid ? stake * dCalc : 0, ticket, prob: impliedProb(d) };
 }
 
 function sheetAdd() {
@@ -1319,7 +1469,14 @@ function sheetAdd() {
         : f.linking === l.id ? linkPicker(l) : `<button class="link" data-act="form-link" data-id="${l.id}">${icons.live} Link a game for live tracking & auto-grading</button>`}
     </div>`;
   }).join("");
-  return `<div class="sheet-h"><h2>Add a pick</h2>${closeBtn()}</div>
+  const src = f.source;
+  const imported = src
+    ? `<div class="imported">${src.img ? `<img src="${esc(src.img)}" alt="Your bet slip">` : `<span class="imp-ico">${icons.upload}</span>`}
+        <div><b>Filled in from your ${src.img ? "screenshot" : "text"}${f.book ? ` · ${esc(f.book)}` : ""}</b>
+        <span>Check each leg and price — reading screenshots isn't perfect.${src.missing ? ` <b>${src.missing} leg${src.missing > 1 ? "s" : ""} couldn't be read</b>; fill ${src.missing > 1 ? "them" : "it"} in below.` : ""}${src.linked ? ` ${src.linked} of ${legs.length} matched to a game for live tracking.` : ""}</span></div></div>`
+    : "";
+  return `<div class="sheet-h"><h2>${src ? "Review imported bet" : "Add a pick"}</h2>${closeBtn()}</div>
+    ${imported}
     <div class="form-top">
       <div class="seg type-seg">
         <button class="${f.type === "straight" ? "on" : ""}" data-act="form-type" data-v="straight"><b>Straight</b><small>one pick</small></button>
@@ -1338,6 +1495,7 @@ function sheetAdd() {
       <span class="swap">⇄</span>
       <label class="field"><span>To win</span><label class="stake"><span>$</span><input id="f-win" data-in="f-win" inputmode="decimal" value="${esc(f.lastEdited === "win" ? f.win : c.win ? c.win.toFixed(2) : "")}"></label></label>
     </div>
+    <label class="field"><span>Payout on your ticket <small>optional · makes hedgehog match your book to the cent</small></span><label class="stake"><span>$</span><input id="f-ticket" data-in="f-ticket" inputmode="decimal" placeholder="${c.calcPayout ? c.calcPayout.toFixed(2) : "from your book"}" value="${esc(f.ticket)}"></label></label>
     <div id="form-calc">${formCalcHtml(c)}</div>
     <div class="money">
       <label class="field"><span>Book</span><input id="f-book" data-in="f-book" list="books" placeholder="DraftKings, FanDuel…" value="${esc(f.book)}"></label>
@@ -1351,7 +1509,7 @@ function formCalcHtml(c) {
     <div><span>${S.form.type === "parlay" ? "Parlay odds" : "Odds"}</span><b class="odds-big">${c.valid ? odds(c.d) : "—"}</b><small>${c.valid ? (fmt() === "american" ? `${formatOdds(c.d, "decimal")}×` : formatOdds(c.d, "american")) : "check odds"}</small></div>
     <div><span>Implied</span><b>${fmtPct(c.prob)}</b></div>
     <div><span>Payout</span><b class="pos">${fmtMoney(c.payout || 0)}</b><small>profit ${fmtMoney(c.win || 0)}</small></div>
-  </div>`;
+  </div>${S.form.lastEdited !== "win" ? mismatchNote(c.ticket, c.calcPayout) : ""}`;
 }
 
 function linkPicker(l) {
@@ -1389,10 +1547,11 @@ function saveForm() {
   const legs = c.legs;
   for (const l of legs) {
     if (!l.pick.trim()) return toast(`Name your pick${legs.length > 1 ? "s" : ""} (e.g. "Georgia -7.5")`, "err");
-    if (!(l.odds > 1)) return toast(`Odds for "${l.pick}" don't look right`, "err");
+    if (!(l.odds > 1) && !(num(f.ticket) > 0)) return toast(`Odds for "${l.pick}" don't look right`, "err");
   }
   if (f.type === "parlay" && legs.length < 2) return toast("A parlay needs at least two legs", "err");
   if (!(c.stake > 0)) return toast("Enter a stake", "err");
+  if (!c.legs.every((l) => l.odds > 1) && !(num(f.ticket) > 0)) return toast("Check the odds on each leg", "err");
   const bet = {
     id: uid(),
     createdAt: new Date().toISOString(),
@@ -1402,6 +1561,8 @@ function saveForm() {
     note: f.note.trim(),
     legs: legs.map((l) => ({ id: uid(), pick: l.pick.trim(), odds: l.odds, status: "open", gameId: l.gameId, market: l.market, side: l.side, line: l.line, gameLabel: l.gameLabel, kickoff: l.kickoff })),
   };
+  if (num(f.ticket) > 0 && f.lastEdited !== "win") bet.ticketPayout = Math.round(num(f.ticket) * 100) / 100;
+  if (f.link) bet.link = f.link;
   if (f.type === "parlay") {
     const o = parseOdds(f.override)?.decimal;
     if (o > 1) bet.oddsOverride = o;
@@ -1432,6 +1593,8 @@ function paintForm() {
   }
   const ov = $("#f-override");
   if (ov) ov.placeholder = "calc " + odds(c.calc);
+  const tk = $("#f-ticket");
+  if (tk) tk.placeholder = c.calcPayout ? c.calcPayout.toFixed(2) : "from your book";
   const btn = $('[data-act="form-save"]');
   if (btn) btn.textContent = `Track ${f.type === "parlay" ? `${c.legs.length}-leg parlay` : "bet"}`;
 }
@@ -1468,6 +1631,9 @@ const actions = {
     location.hash = el.dataset.v;
   },
   "open-add": () => openAdd(),
+  "pick-image": () => $("#slip-file").click(),
+  "open-import-text": () => handleText(""),
+  "imp-continue": () => openDraft(),
   "add-for-game": (el) => openAdd({ gameId: el.dataset.id }),
   "open-settings": () => openSheet({ kind: "settings" }),
   "open-bet": (el) => openSheet({ kind: "bet", id: el.dataset.id }),
@@ -1593,6 +1759,20 @@ const actions = {
     b.settledAt = new Date().toISOString();
     saveBets();
     toast(`Cashed out ${fmtMoney(amt)}`, amt >= b.stake ? "won" : "");
+    render();
+  },
+  "set-ticket": (el) => {
+    const b = findBet(el.dataset.id);
+    const v = num($("#ticket-amt")?.value);
+    if (!(v > b.stake * 0.99)) return toast("Enter the total payout shown on your ticket (stake + winnings)", "err");
+    b.ticketPayout = Math.round(v * 100) / 100;
+    saveBets();
+    toast(`Payout set to ${fmtMoney(b.ticketPayout)}`, "won");
+    render();
+  },
+  "clear-ticket": (el) => {
+    delete findBet(el.dataset.id).ticketPayout;
+    saveBets();
     render();
   },
   "undo-cashout": (el) => {
@@ -1811,6 +1991,11 @@ const inputs = {
     l.pick = el.value;
     saveSlip();
   },
+  "slip-ticket": (el) => {
+    S.slip.ticket = el.value;
+    saveSlip();
+    paintSlipCalc();
+  },
   "slip-book": (el) => {
     S.slip.book = el.value;
     saveSlip();
@@ -1840,6 +2025,12 @@ const inputs = {
   "f-stake": (el) => ((S.form.stake = el.value), (S.form.lastEdited = "stake"), paintForm()),
   "f-win": (el) => ((S.form.win = el.value), (S.form.lastEdited = "win"), paintForm()),
   "f-book": (el) => (S.form.book = el.value),
+  "f-ticket": (el) => ((S.form.ticket = el.value), paintForm()),
+  "imp-text": (el) => {
+    S.imp.text = el.value;
+    S.imp.parsed = parseSlipText(el.value);
+    $("#imp-preview").innerHTML = importPreview();
+  },
   "f-note": (el) => (S.form.note = el.value),
   "f-q": (el) => {
     S.form.q = el.value;
@@ -1879,6 +2070,11 @@ document.addEventListener("change", (e) => {
   const el = e.target;
   if (el.matches('input[type="checkbox"][data-act]')) return actions[el.dataset.act]?.(el);
   if (el.dataset.change === "import") return importFile(el.files?.[0]);
+  if (el.id === "slip-file") {
+    const f = el.files?.[0];
+    el.value = "";
+    return handleImage(f);
+  }
   // Odds boxes: reformat once the user leaves the field.
   if (el.dataset.in === "slip-odds") {
     const l = S.slip.legs.find((x) => x.id === el.dataset.id);
@@ -1905,6 +2101,10 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && S.sheet) {
     S.sheet = null;
     render();
+  }
+  if ((e.key === "Enter" || e.key === " ") && e.target.matches(".dropzone")) {
+    e.preventDefault();
+    $("#slip-file").click();
   }
   if (e.key === "Enter" && e.target.matches("[data-act='open-bet'],[data-act='open-game']") && e.target.tagName !== "BUTTON") {
     actions[e.target.dataset.act](e.target);
@@ -1935,6 +2135,57 @@ async function importFile(file) {
     toast("That file isn't a hedgehog export", "err");
   }
 }
+
+// Drag a screenshot anywhere onto the page.
+let dragDepth = 0;
+const hasFiles = (e) => [...(e.dataTransfer?.types || [])].includes("Files");
+window.addEventListener("dragenter", (e) => {
+  if (!hasFiles(e)) return;
+  e.preventDefault();
+  dragDepth++;
+  $("#dropover").hidden = false;
+});
+window.addEventListener("dragover", (e) => {
+  if (hasFiles(e)) e.preventDefault();
+});
+window.addEventListener("dragleave", (e) => {
+  if (!hasFiles(e)) return;
+  dragDepth = Math.max(0, dragDepth - 1);
+  if (!dragDepth) $("#dropover").hidden = true;
+});
+window.addEventListener("drop", (e) => {
+  dragDepth = 0;
+  $("#dropover").hidden = true;
+  const dt = e.dataTransfer;
+  if (!dt) return;
+  const file = [...(dt.files || [])].find((f) => f.type.startsWith("image/"));
+  if (file) {
+    e.preventDefault();
+    return handleImage(file);
+  }
+  const text = dt.getData("text/uri-list") || dt.getData("text/plain");
+  if (text && !e.target.closest?.("input, textarea")) {
+    e.preventDefault();
+    handleText(text);
+  }
+});
+
+// Paste a screenshot (or share text) anywhere that isn't a text field.
+document.addEventListener("paste", (e) => {
+  const cd = e.clipboardData;
+  if (!cd) return;
+  const img = [...cd.items].find((i) => i.kind === "file" && i.type.startsWith("image/"));
+  if (img) {
+    e.preventDefault();
+    return handleImage(img.getAsFile());
+  }
+  if (e.target.closest?.("input, textarea, [contenteditable]")) return;
+  const text = cd.getData("text/plain");
+  if (text?.trim()) {
+    e.preventDefault();
+    handleText(text);
+  }
+});
 
 window.addEventListener("hashchange", () => {
   const t = location.hash.slice(1);
@@ -1967,6 +2218,7 @@ function boot() {
   $("#btn-settings").innerHTML = icons.gear;
   $("#btn-add").innerHTML = `${icons.plus}<span>Add pick</span>`;
   $("#fab").innerHTML = icons.plus;
+  $("#dropover .dz-ico").innerHTML = icons.upload;
   $("#today-top").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
   loadCache();
   // Legs from old slip state must still point at games; drop dead ones silently.

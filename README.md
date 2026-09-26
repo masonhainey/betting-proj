@@ -34,6 +34,13 @@ To try it without real bets, open **Settings → Demo mode**. It loads a simulat
 
 Open bets have manual grading per leg, cash-out, a hedge calculator and notes.
 
+**Import a slip.** Drop a screenshot onto the page, paste one, or pick one from your photos. You can also paste the share text or link your book gives you.
+- Screenshots are read in the browser with [Tesseract.js](https://github.com/naptha/tesseract.js). It's downloaded from jsDelivr the first time (~12 MB), and the image never leaves your device.
+- hedgehog pulls out the book, legs, odds, stake and payout, and matches each pick to a real game so it tracks live and auto-grades. You review everything before it's saved.
+- Share links can't be read directly, because books require a login, but the link is saved on the bet.
+
+**Ticket payout.** Books don't always pay exactly what the leg odds multiply to. They round each leg's price, price same-game parlays with their own correlation math, and prices can move between building a slip and placing it. Enter the payout printed on your ticket, either when adding the bet or later from the bet's detail view. hedgehog will use that number and show how far off the leg math was.
+
 ## How it holds up when feeds fail
 
 - Schedule requests go out a week at a time. If one fails, that week is fetched day by day, and games already on screen for a day that fails stay there.
@@ -49,6 +56,8 @@ js/espn.js    ESPN fetch + normalization (handles both odds formats ESPN has shi
 js/odds.js    American/decimal/fractional parsing, stepping, parlay, hedge, no-vig
 js/grade.js   bet model, live leg status, auto-grading, stats
 js/news.js    headline tagging
+js/slipparse.js  bet-slip text → draft bet; matches picks to games
+js/ocr.js     lazy-loaded Tesseract.js OCR with dark-mode image cleanup
 js/demo.js    simulated data source with the same interface as espn.js
 tests/        node --test
 ```
