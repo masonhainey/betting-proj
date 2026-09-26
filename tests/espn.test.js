@@ -52,3 +52,13 @@ test("news tagging", () => {
   assert.ok(tagArticle({ headline: "Week 6 preview: key matchups", description: "" }).includes("preview"));
   assert.deepEqual(tagArticle({ headline: "Band performs at halftime", description: "" }), ["general"]);
 });
+
+test("win probability from moneyline, falling back to spread", async () => {
+  const { winProb } = await import("../js/ui.js");
+  const byMl = winProb({ odds: { ml: { home: -200, away: 170 } } });
+  assert.ok(Math.abs(byMl.home + byMl.away - 1) < 1e-9);
+  assert.ok(byMl.home > 0.6 && byMl.home < 0.7, String(byMl.home));
+  const bySpread = winProb({ odds: { spread: { home: { line: -7 } } } });
+  assert.ok(bySpread.home > 0.7 && bySpread.home < 0.8);
+  assert.equal(winProb({ odds: null }), null);
+});

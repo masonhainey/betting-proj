@@ -1,5 +1,7 @@
 // Small rendering helpers shared by every view.
 
+import { americanToDecimal, noVig } from "./odds.js";
+
 export const esc = (s) =>
   String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 
@@ -48,15 +50,62 @@ export function relDay(iso) {
   return fmtDay(iso);
 }
 
-/** Team badge: logo when it loads, colored monogram underneath as fallback. */
+const DARK = typeof matchMedia === "function" && matchMedia("(prefers-color-scheme: dark)").matches;
+
+/** ESPN logo URL for a team, preferring the dark-background variant in dark mode. */
+export function logoUrl(t) {
+  const base = t.logo || (/^\d+$/.test(t.id || "") ? `https://a.espncdn.com/i/teamlogos/ncaa/500/${t.id}.png` : "");
+  return DARK ? base.replace("/ncaa/500/", "/ncaa/500-dark/") : base;
+}
+
+/**
+ * Team logo. The colored monogram sits underneath until the image loads; if the dark
+ * variant 404s we fall back to the regular logo, and if that fails the monogram stays.
+ */
 export function logo(t, size = 28) {
-  const bg = t.color || "#3a4150";
+  const bg = t.color || "#3a3548";
+  const src = logoUrl(t);
   return `<span class="logo" style="--sz:${size}px;--tc:${esc(bg)}"><span class="mono">${esc((t.abbr || "?").slice(0, 4))}</span>${
-    t.logo ? `<img src="${esc(t.logo)}" alt="" loading="lazy" onerror="this.remove()">` : ""
+    src
+      ? `<img src="${esc(src)}" alt="" loading="lazy" onload="this.parentNode.classList.add('ok')" onerror="if(this.src.includes('/500-dark/')){this.src=this.src.replace('/500-dark/','/500/')}else{this.remove()}">`
+      : ""
   }</span>`;
 }
 
-export const rank = (t) => (t.rank ? `<span class="rk">${t.rank}</span>` : "");
+const STAR = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2.8l2.8 5.9 6.4.8-4.7 4.4 1.2 6.4L12 17.2l-5.7 3.1 1.2-6.4-4.7-4.4 6.4-.8z"/></svg>`;
+
+/** AP Top 25 marker: gold star + rank. */
+export const rank = (t) => (t.rank ? `<span class="rk" title="AP No. ${t.rank}">${STAR}${t.rank}</span>` : "");
+
+export const rankedMatchup = (g) => !!(g.home.rank && g.away.rank);
+export const rankedBadge = (g) => (rankedMatchup(g) ? `<span class="badge ranked">${STAR}Ranked matchup</span>` : "");
+
+/**
+ * Pregame win probability from the market: no-vig moneyline when both sides are posted,
+ * otherwise a spread-based estimate. Returns { home, away } in 0..1, or null.
+ */
+export function winProb(g) {
+  const o = g?.odds;
+  if (!o) return null;
+  if (o.ml?.home != null && o.ml?.away != null) {
+    const r = noVig(americanToDecimal(o.ml.home), americanToDecimal(o.ml.away));
+    if (Number.isFinite(r.p1) && Number.isFinite(r.p2)) return { home: r.p1, away: r.p2, src: "moneyline" };
+  }
+  if (o.spread?.home?.line != null) {
+    const home = 1 / (1 + Math.exp(o.spread.home.line / 5.8));
+    return { home, away: 1 - home, src: "spread" };
+  }
+  return null;
+}
+
+export const pct = (p) => `${Math.round(p * 100)}%`;
+
+/** Split bar in the two teams' colors, sized by win probability. */
+export function wpBar(g, wp) {
+  if (!wp) return "";
+  const ac = g.away.color || "#6b6580", hc = g.home.color || "#8e87a3";
+  return `<div class="wpbar" title="Win probability from ${wp.src}"><i style="--c:${esc(ac)};flex:${wp.away.toFixed(3)}"></i><i style="--c:${esc(hc)};flex:${wp.home.toFixed(3)}"></i></div>`;
+}
 
 export function statusText(g) {
   if (g.state === "in") return g.shortDetail || `Q${g.period} ${g.clock}`;

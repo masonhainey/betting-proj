@@ -1,5 +1,5 @@
 {
-  "name": "linewatch",
+  "name": "hedgehog",
   "private": true,
   "type": "module",
   "description": "Pikkit-style bet tracker and live college football dashboard. Static site, no build step.",

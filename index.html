@@ -3,25 +3,27 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>Linewatch</title>
+  <title>hedgehog</title>
   <meta name="description" content="Bet tracker and live college football dashboard: log straight bets and parlays, sweat them live, and build slips against real lines.">
-  <meta name="theme-color" content="#0b0e14" media="(prefers-color-scheme: dark)">
-  <meta name="theme-color" content="#f5f7fa" media="(prefers-color-scheme: light)">
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0e14'/%3E%3Cpath d='M6 21l6-6 5 4 9-10' stroke='%2335e39a' stroke-width='3.2' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+  <meta name="theme-color" content="#09080c" media="(prefers-color-scheme: dark)">
+  <meta name="theme-color" content="#f6f5f9" media="(prefers-color-scheme: light)">
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%2309080c'/%3E%3Cpath d='M3 24l3-7 2 3 3-9 3 6 3-10 3 8 3-5 2 5 4 9z' fill='%23a78bfa'/%3E%3C/svg%3E">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter+Tight:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <header class="top">
-    <a class="brand" href="#bets" aria-label="Linewatch home">
-      <svg viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="9"/><path d="M6 21l6-6 5 4 9-10"/></svg>
-      <span>Linewatch</span>
+    <a class="brand" href="#bets" aria-label="hedgehog home">
+      <svg viewBox="0 0 38 26" aria-hidden="true"><path d="M1 25l4-9 3 4 4-12 4 8 4-14 4 11 4-7 3 7 6 12z"/></svg>
+      <span>hedgehog</span>
       <span id="demo-flag" class="demo-flag" hidden>Demo</span>
     </a>
     <nav class="nav" id="nav" aria-label="Sections"></nav>
     <div class="top-r">
+      <span class="today-top" id="today-top"></span>
+      <span class="cfb-tag">CFB scores</span>
       <span id="sync" class="sync" aria-hidden="true"></span>
       <div id="fmt-toggle" class="fmt-top"></div>
       <button class="btn sm primary add-top" id="btn-add" data-act="open-add"></button>

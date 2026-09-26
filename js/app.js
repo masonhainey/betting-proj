@@ -13,7 +13,7 @@ import { load, save, uid, DEFAULT_SETTINGS } from "./store.js";
 import { TAGS, tagArticle, mentionsTeam } from "./news.js";
 import {
   esc, tzAbbr, fmtTime, fmtDay, fmtDayLong, fmtDayTime, dayKey, startOfDay, ago, relDay,
-  logo, rank, statusText, curveSvg, icons,
+  logo, rank, statusText, curveSvg, icons, rankedBadge, winProb, pct, wpBar,
 } from "./ui.js";
 
 // ───────────────────────────── state ─────────────────────────────
@@ -627,17 +627,22 @@ function myActionCount(gid) {
 }
 
 function scoreRows(g, { big = false } = {}) {
+  const wp = g.state === "pre" ? winProb(g) : null;
   const row = (t, side) => {
     const poss = g.state === "in" && g.situation?.possession === t.id;
     const lead = g.state !== "pre" && t.score != null && t.score > (side === "home" ? g.away.score : g.home.score);
+    const p = wp?.[side];
+    const slot = g.state === "pre"
+      ? `<span class="wp ${p != null && p >= 0.5 ? "fav" : ""}" title="${wp ? `Win probability (no-vig ${wp.src})` : "No line yet"}">${p != null ? pct(p) : "—"}</span>`
+      : `<span class="score ${lead ? "lead" : ""}">${t.score ?? ""}</span>`;
     return `<div class="trow ${g.state === "post" && !t.winner ? "dim" : ""}">
-      ${logo(t, big ? 36 : 26)}
+      ${logo(t, big ? 40 : 28)}
       <span class="tname">${rank(t)}${esc(big ? t.name : t.short)}${t.record ? `<small>${esc(t.record)}</small>` : ""}</span>
       ${poss ? `<span class="poss" title="Possession"></span>` : ""}
-      <span class="score ${lead ? "lead" : ""}">${g.state === "pre" ? "" : t.score ?? ""}</span>
+      ${slot}
     </div>`;
   };
-  return row(g.away, "away") + row(g.home, "home");
+  return row(g.away, "away") + row(g.home, "home") + (wp ? wpBar(g, wp) : "");
 }
 
 function kickBadge(g) {
@@ -686,7 +691,7 @@ function viewBets() {
     return `<section class="empty-hero">
       <div class="eh-mark">${icons.bets}</div>
       <h1>Your bets, front and center.</h1>
-      <p>Log a pick from any book — straight or parlay, American or decimal odds — and Linewatch tracks it against live scores, grades it when the game ends, and keeps your P/L honest.</p>
+      <p>Log a pick from any book — straight or parlay, American or decimal odds — and hedgehog tracks it against live scores, grades it when the game ends, and keeps your P/L honest.</p>
       <div class="eh-actions">
         <button class="btn primary" data-act="open-add">${icons.plus} Add a pick</button>
         <button class="btn" data-act="tab" data-v="build">Build a slip</button>
@@ -736,7 +741,8 @@ function viewBets() {
       ? `<div class="bet-list">${groupByDay(arr, S.f.betsTab === "open" ? (b) => b.createdAt : (b) => b.settledAt || b.createdAt).map(([k, bs]) => `<div class="day-h">${esc(k)}</div>${bs.map(betCard).join("")}`).join("")}</div>`
       : `<div class="empty">${S.f.betsTab === "open" ? "No open bets. Tap <b>Add pick</b> or build a slip." : "Nothing settled yet."}</div>`;
   }
-  return `<div class="bets-grid">${hero}<div>${sweat}${tabs}${list}</div></div>`;
+  const page = `<div class="view-h page"><div><div class="eyebrow">Game day workspace</div><h1>College football</h1><p class="muted">Track straight bets and parlays alongside live scores.</p></div></div>`;
+  return `${page}<div class="bets-grid">${hero}<div>${sweat}${tabs}${list}</div></div>`;
 }
 
 function groupByDay(arr, dateFn) {
@@ -854,7 +860,7 @@ function viewLive() {
   const live = filtered.filter((g) => g.state === "in"), pre = filtered.filter((g) => g.state === "pre"), post = filtered.filter((g) => g.state === "post");
   const st = S.st.today;
   const head = `<div class="view-h">
-    <div><h1>${esc(fmtDayLong(new Date()))}</h1>
+    <div><div class="eyebrow">Scoreboard</div><h1>${esc(fmtDayLong(new Date()))}</h1>
       <p class="muted">${all.filter((g) => g.state === "in").length} live · ${all.length} FBS games · <span class="upd">${st.loading ? "updating…" : `updated <span data-ago="${st.at || 0}">${ago(st.at)}</span>`}</span></p></div>
     <button class="icon-btn" data-act="refresh" data-v="today" aria-label="Refresh">${icons.refresh}</button>
   </div>
@@ -869,7 +875,7 @@ function liveCard(g) {
   const mine = myActionCount(g.id);
   const sit = g.state === "in" && g.situation;
   return `<article class="gcard ${g.state} ${sit?.redZone ? "rz" : ""} ${mine ? "mine" : ""}" data-act="open-game" data-id="${g.id}" tabindex="0">
-    <header><span class="gstatus">${g.state === "in" ? `<span class="dot live"></span>` : ""}${esc(statusText(g))}</span>${g.tv ? `<span class="tv">${esc(g.tv)}</span>` : ""}<span class="grow"></span>${mine ? `<span class="badge mine">${mine} bet${mine > 1 ? "s" : ""}</span>` : ""}</header>
+    <header><span class="gstatus">${g.state === "in" ? `<span class="dot live"></span>` : ""}${esc(statusText(g))}</span>${g.tv ? `<span class="tv">${esc(g.tv)}</span>` : ""}<span class="grow"></span>${rankedBadge(g)}${mine ? `<span class="badge mine">${mine} bet${mine > 1 ? "s" : ""}</span>` : ""}</header>
     <div class="teams">${scoreRows(g)}</div>
     ${sit ? `<div class="sit">${sit.redZone ? `<span class="badge rz">Red zone</span>` : ""}${sit.downDistance ? `<span>${esc(sit.downDistance)}</span>` : ""}${sit.lastPlay ? `<span class="lp">${esc(sit.lastPlay)}</span>` : ""}</div>` : ""}
     ${g.odds && g.state !== "post" ? `<footer class="muted">${lineSummary(g)}</footer>` : ""}
@@ -896,7 +902,7 @@ function viewSchedule() {
   }
   const from = addDays(startOfDay(), 1);
   const head = `<div class="view-h">
-    <div><h1>Upcoming</h1>
+    <div><div class="eyebrow">Next four weeks</div><h1>Upcoming</h1>
       <p class="muted">From ${esc(fmtDay(from))} · next 4 weeks · times in ${esc(tzAbbr)} · <span class="upd">${st.loading ? "checking for changes…" : `checked <span data-ago="${st.at || st.cachedAt || 0}">${ago(st.at || st.cachedAt)}</span>`}</span></p></div>
     <button class="icon-btn" data-act="refresh" data-v="schedule" aria-label="Refresh">${icons.refresh}</button>
   </div>
@@ -920,15 +926,20 @@ function viewSchedule() {
 
 function schedRow(g) {
   const mine = myActionCount(g.id);
-  return `<button class="srow" data-act="open-game" data-id="${g.id}">
+  const wp = winProb(g);
+  const team = (t, side) => {
+    const p = wp?.[side];
+    return `<span class="steam">${logo(t, 26)}<span class="sname">${rank(t)}<b>${esc(t.short)}</b>${t.record ? `<small>${esc(t.record)}</small>` : ""}</span><span class="wp ${p != null && p >= 0.5 ? "fav" : ""}">${p != null ? pct(p) : "—"}</span></span>`;
+  };
+  const tags = [rankedBadge(g), kickBadge(g), mine ? `<span class="badge mine">${mine} bet${mine > 1 ? "s" : ""}</span>` : ""].join("");
+  return `<button class="srow ${g.home.rank && g.away.rank ? "ranked" : ""}" data-act="open-game" data-id="${g.id}">
     <span class="stime">${g.timeValid ? esc(fmtTime(g.date)) : "TBD"}${g.tv ? `<small>${esc(g.tv)}</small>` : ""}</span>
     <span class="smatch">
-      <span class="steam">${logo(g.away, 22)}${rank(g.away)}<b>${esc(g.away.short)}</b></span>
-      <span class="at">${g.neutral ? "vs" : "@"}</span>
-      <span class="steam">${logo(g.home, 22)}${rank(g.home)}<b>${esc(g.home.short)}</b></span>
-      ${kickBadge(g)}${mine ? `<span class="badge mine">${mine} bet${mine > 1 ? "s" : ""}</span>` : ""}
+      ${team(g.away, "away")}${team(g.home, "home")}
+      ${wpBar(g, wp)}
+      ${tags.trim() ? `<span class="stags">${tags}</span>` : ""}
     </span>
-    <span class="sline">${lineSummary(g) || `<span class="muted">No line yet</span>`}</span>
+    <span class="sline">${lineSummary(g) || `<span class="muted">No line yet</span>`}${g.neutral ? `<small>Neutral site</small>` : ""}</span>
   </button>`;
 }
 
@@ -953,7 +964,7 @@ function viewBuild() {
   return `<div class="build">
     <div class="build-main">
       <div class="view-h">
-        <div><h1>Build</h1><p class="muted">Tap prices to build a slip. ${provider ? `Lines: ${esc(provider)} via ESPN` : "Lines from ESPN"} · refreshes automatically.</p></div>
+        <div><div class="eyebrow">Slip builder</div><h1>Build</h1><p class="muted">Tap prices to build a slip. ${provider ? `Lines: ${esc(provider)} via ESPN` : "Lines from ESPN"} · refreshes automatically.</p></div>
       </div>
       <div class="toolbar">
         <label class="switch ${S.sim ? "on" : ""}" title="Simulate a live market: prices tick every couple seconds so you can see how your slip reacts. Real lines are unchanged."><input type="checkbox" data-act="sim" ${S.sim ? "checked" : ""}><span class="knob"></span>Market sim</label>
@@ -971,7 +982,7 @@ function boardRow(g) {
   const m = markets(g);
   return `<div class="brow">
     <button class="bteams" data-act="open-game" data-id="${g.id}">
-      <span class="btime">${esc(relDay(g.date))} · ${g.timeValid ? esc(fmtTime(g.date)) : "TBD"}${g.tv ? ` · ${esc(g.tv)}` : ""}</span>
+      <span class="btime">${esc(relDay(g.date))} · ${g.timeValid ? esc(fmtTime(g.date)) : "TBD"}${g.tv ? ` · ${esc(g.tv)}` : ""}${g.home.rank && g.away.rank ? ` · <span class="rk-inline">★ Ranked</span>` : ""}</span>
       <span class="bt">${logo(g.away, 20)}${rank(g.away)}${esc(g.away.short)}</span>
       <span class="bt">${logo(g.home, 20)}${rank(g.home)}${esc(g.home.short)}</span>
     </button>
@@ -1092,7 +1103,7 @@ function viewNews() {
   else if (f !== "all" && f !== "move") arts = arts.filter((a) => a.tags.includes(f));
   const counts = Object.fromEntries(Object.keys(TAGS).map((k) => [k, S.news.filter((a) => a.tags.includes(k)).length]));
   counts.move = moves.length;
-  const head = `<div class="view-h"><div><h1>News & moves</h1><p class="muted">Injuries, line movement, pressers and look-aheads · <span class="upd">${st.loading ? "updating…" : `updated <span data-ago="${st.at || 0}">${ago(st.at)}</span>`}</span></p></div>
+  const head = `<div class="view-h"><div><div class="eyebrow">The wire</div><h1>News & moves</h1><p class="muted">Injuries, line movement, pressers and look-aheads · <span class="upd">${st.loading ? "updating…" : `updated <span data-ago="${st.at || 0}">${ago(st.at)}</span>`}</span></p></div>
     <button class="icon-btn" data-act="refresh" data-v="news" aria-label="Refresh">${icons.refresh}</button></div>
     <div class="chips scroll">
       ${chip("All", "news-f", "all", f === "all")}
@@ -1102,7 +1113,7 @@ function viewNews() {
   const movesHtml = (f === "all" || f === "move") && moves.length
     ? `<section class="moves"><div class="sec-h"><h2>Line moves we've seen</h2><span class="muted">tracked since you started watching</span></div>
        <div class="move-list">${moves.slice(0, f === "move" ? 50 : 6).map(moveCard).join("")}</div></section>`
-    : f === "move" ? `<div class="empty">No line moves spotted yet. Linewatch compares every refresh against the last number it saw.</div>` : "";
+    : f === "move" ? `<div class="empty">No line moves spotted yet. hedgehog compares every refresh against the last number it saw.</div>` : "";
   if (f === "move") return head + movesHtml;
   const body = arts.length
     ? `<div class="news-list">${arts.map(newsCard).join("")}</div>`
@@ -1152,7 +1163,7 @@ function skeleton(n, kind = "card") {
 }
 
 function errorBox(title, detail, what) {
-  return `<div class="errbox"><h3>${esc(title)}</h3><p class="muted">${esc(detail)}. Linewatch retries on its own every 45 seconds.</p><button class="btn sm" data-act="refresh" data-v="${what}">${icons.refresh} Try now</button></div>`;
+  return `<div class="errbox"><h3>${esc(title)}</h3><p class="muted">${esc(detail)}. hedgehog retries on its own every 45 seconds.</p><button class="btn sm" data-act="refresh" data-v="${what}">${icons.refresh} Try now</button></div>`;
 }
 
 function staleNote(st) {
@@ -1176,7 +1187,7 @@ function sheetGame() {
       <div class="gs-status">${g.state === "in" ? `<span class="dot live"></span>` : ""}${esc(g.state === "pre" ? (g.timeValid ? fmtDayTime(g.date) : `${fmtDay(g.date)} · TBD`) : g.detail || statusText(g))}</div>
       <div class="teams big">${scoreRows(g, { big: true })}</div>
       <div class="gs-meta">${[g.tv, g.venue, g.city, g.notes].filter(Boolean).map(esc).join(" · ")}</div>
-      ${kickBadge(g)}
+      <div class="stags">${rankedBadge(g)}${kickBadge(g)}</div>
       ${g.state === "in" && g.situation?.lastPlay ? `<div class="lp">${esc(g.situation.lastPlay)}</div>` : ""}
     </div>
     ${m ? `<h3 class="sh3">Markets <small>${esc(o.provider)}${S.sim ? " · sim on" : ""}</small></h3>
@@ -1439,7 +1450,7 @@ function sheetSettings() {
       <span class="grow"></span>
       <button class="btn sm danger" data-act="wipe">${S.confirmDelete === "wipe" ? "Tap again to erase all bets" : "Erase all bets"}</button>
     </div>
-    <p class="muted small foot">Scores, schedule, lines and news come from ESPN's public feeds. Linewatch is for tracking and fun — it doesn't place bets.</p>`;
+    <p class="muted small foot">Scores, schedule, lines and news come from ESPN's public feeds. hedgehog is for tracking and fun — it doesn't place bets.</p>`;
 }
 
 // ───────────────────────────── events ─────────────────────────────
@@ -1732,10 +1743,10 @@ const actions = {
     location.reload();
   },
   export: () => {
-    const blob = new Blob([JSON.stringify({ app: "linewatch", version: 1, exportedAt: new Date().toISOString(), bets: S.bets, settings }, null, 2)], { type: "application/json" });
+    const blob = new Blob([JSON.stringify({ app: "hedgehog", version: 1, exportedAt: new Date().toISOString(), bets: S.bets, settings }, null, 2)], { type: "application/json" });
     const a = document.createElement("a");
     a.href = URL.createObjectURL(blob);
-    a.download = `linewatch-${ymd(new Date())}.json`;
+    a.download = `hedgehog-${ymd(new Date())}.json`;
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   },
@@ -1921,7 +1932,7 @@ async function importFile(file) {
     S.sheet = null;
     render();
   } catch {
-    toast("That file isn't a Linewatch export", "err");
+    toast("That file isn't a hedgehog export", "err");
   }
 }
 
@@ -1956,6 +1967,7 @@ function boot() {
   $("#btn-settings").innerHTML = icons.gear;
   $("#btn-add").innerHTML = `${icons.plus}<span>Add pick</span>`;
   $("#fab").innerHTML = icons.plus;
+  $("#today-top").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
   loadCache();
   // Legs from old slip state must still point at games; drop dead ones silently.
   render();
