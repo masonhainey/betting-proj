@@ -41,6 +41,24 @@ Open bets have manual grading per leg, cash-out, a hedge calculator and notes.
 
 **Ticket payout.** Books don't always pay exactly what the leg odds multiply to. They round each leg's price, price same-game parlays with their own correlation math, and prices can move between building a slip and placing it. Enter the payout printed on your ticket, either when adding the bet or later from the bet's detail view. hedgehog will use that number and show how far off the leg math was.
 
+## Accounts & sync (optional)
+
+Sign in with an email code and your bets and settings stay in sync across your phone and computer.
+- Bets are saved on the device first, so the app still works offline and syncs when you're back online.
+- If the same bet is edited on two devices, the most recent edit wins, and deletes carry over to every device.
+- Every account can only see its own data (the database enforces this with row-level security).
+
+With `js/config.js` left empty, the app runs local-only, exactly as before.
+
+**One-time setup (about 5 minutes):**
+1. Create a free project at [supabase.com](https://supabase.com).
+2. In **SQL Editor**, paste all of [`supabase/schema.sql`](supabase/schema.sql) and click **Run**.
+3. In **Authentication → Emails → Magic Link**, add `{{ .Token }}` to the email body so the email includes the 6-digit code, e.g. `Your hedgehog code: <b>{{ .Token }}</b>`. Sign-in uses a code rather than a link because on iPhone, a link opens Safari instead of the home-screen app.
+4. In **Authentication → URL Configuration**, set **Site URL** to `https://masonhainey.github.io/betting-proj/`.
+5. From **Project Settings → API**, copy the **Project URL** and the **anon public** key into `js/config.js`. The anon key is safe to put in public code; never use the `service_role` key.
+
+Supabase's built-in email sender allows only a few emails per hour, which is plenty for personal use. If you add more users, connect your own SMTP in Supabase.
+
 ## How it holds up when feeds fail
 
 - Schedule requests go out a week at a time. If one fails, that week is fetched day by day, and games already on screen for a day that fails stay there.
@@ -55,11 +73,15 @@ js/app.js     state, polling, views, events
 js/espn.js    ESPN fetch + normalization (handles both odds formats ESPN has shipped)
 js/odds.js    American/decimal/fractional parsing, stepping, parlay, hedge, no-vig
 js/grade.js   bet model, live leg status, auto-grading, stats
+js/cloud.js   Supabase sign-in (email code) + records table over fetch
+js/sync.js    local-first sync: change detection, tombstones, last-write-wins merge
+js/config.js  Supabase project URL + anon key (empty = local-only)
 js/news.js    headline tagging
 js/slipparse.js  bet-slip text → draft bet; matches picks to games
 js/ocr.js     lazy-loaded Tesseract.js OCR with dark-mode image cleanup
 js/demo.js    simulated data source with the same interface as espn.js
+supabase/     schema.sql to paste into Supabase
 tests/        node --test
 ```
 
-Bets are stored only in the browser. Use **Settings → Export/Import JSON** to back them up or move them between devices.
+Without an account, bets are stored only in the browser. Use **Settings → Export/Import JSON** to back them up or move them between devices.

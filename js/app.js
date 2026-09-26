@@ -11,6 +11,8 @@ import {
 } from "./grade.js";
 import { parseSlipText, linkPick, readScore } from "./slipparse.js";
 import { readImage } from "./ocr.js";
+import * as cloud from "./cloud.js";
+import { emptyMeta, syncOnce } from "./sync.js";
 import { load, save, uid, DEFAULT_SETTINGS } from "./store.js";
 import { TAGS, tagArticle, mentionsTeam } from "./news.js";
 import {
@@ -50,9 +52,15 @@ const src = () => (settings.demo ? demo : espn);
 const game = (id) => S.games.get(id);
 const fmt = () => settings.oddsFormat;
 const odds = (d) => formatOdds(d, fmt());
-const saveBets = () => save(NS + "bets", S.bets);
+const saveBets = () => {
+  save(NS + "bets", S.bets);
+  syncSoon();
+};
 const saveSlip = () => save(NS + "slip", S.slip);
-const saveSettings = () => save("settings", settings);
+const saveSettings = () => {
+  save("settings", settings);
+  syncSoon();
+};
 const num = (v) => {
   const n = parseFloat(String(v ?? "").replace(/[$,]/g, ""));
   return Number.isFinite(n) ? n : 0;
@@ -229,6 +237,7 @@ function tick(force) {
   due("betGames", 90000, refreshBetGames);
   due("news", 600000, refreshNews);
   paintAgo();
+  if (CLOUD && cloud.currentUser() && !document.hidden && Date.now() - Math.max(acct.lastSync, acct.lastTry || 0) > 30000) syncNow();
 }
 
 // ───────────────────────────── markets / slip ─────────────────────────────
@@ -494,6 +503,118 @@ function seedDemo() {
   saveBets();
 }
 
+// ───────────────────────────── accounts & sync ─────────────────────────────
+
+// Sync is off in demo mode (demo bets are fake) and when no Supabase project is set.
+const CLOUD = cloud.configured && !settings.demo;
+const acct = { step: "email", email: "", busy: false, error: "", status: "idle", lastSync: 0, syncError: "", firstDone: false };
+let syncMeta = load("sync", null);
+let syncTimer = null;
+let syncing = null;
+let syncAgain = false;
+
+function syncSoon(ms = 1500) {
+  if (!CLOUD || !cloud.currentUser()) return;
+  clearTimeout(syncTimer);
+  syncTimer = setTimeout(syncNow, ms);
+}
+
+async function syncNow({ announce = false } = {}) {
+  const user = cloud.currentUser();
+  if (!CLOUD || !user) return;
+  if (syncing) {
+    syncAgain = true;
+    return syncing;
+  }
+  syncing = (async () => {
+    if (!syncMeta || syncMeta.userId !== user.id) {
+      // Bets left on this device by a *different* account are safe in that account;
+      // don't mix them into this one.
+      if (syncMeta?.userId && syncMeta.userId !== user.id) S.bets = [];
+      syncMeta = emptyMeta(user.id);
+    }
+    acct.lastTry = Date.now();
+    const first = !syncMeta.lastPull;
+    const before = S.bets.length;
+    acct.status = "syncing";
+    paintAcct();
+    try {
+      const r = await syncOnce({ getBets: () => S.bets, remote: cloud.remote, meta: syncMeta, userId: user.id, settings });
+      S.bets = r.bets;
+      save("bets", S.bets);
+      if (r.settings) {
+        Object.assign(settings, r.settings);
+        save("settings", settings);
+      }
+      save("sync", syncMeta);
+      acct.lastSync = Date.now();
+      acct.syncError = "";
+      acct.status = "ok";
+      const incoming = r.added + r.updated + r.removed;
+      if (first) {
+        toast(r.added ? `Synced: ${S.bets.length} bets in your account (${r.added} from your other device${r.added > 1 ? "s" : ""})` : `Synced: ${before} bet${before === 1 ? "" : "s"} backed up to your account`, "won");
+      } else if (r.added) toast(`${r.added} new bet${r.added > 1 ? "s" : ""} from your other device`, "won");
+      else if (announce) toast(incoming ? `Synced ${incoming} change${incoming > 1 ? "s" : ""}` : "Everything's up to date");
+      if (incoming || r.settings || first) render();
+    } catch (e) {
+      acct.status = e.signedOut ? "idle" : "error";
+      acct.syncError = e.message;
+      if (announce && !e.signedOut) toast(e.message, "err");
+    } finally {
+      syncing = null;
+      paintAcct();
+      if (syncAgain) {
+        syncAgain = false;
+        syncSoon(300);
+      }
+    }
+  })();
+  return syncing;
+}
+
+cloud.onAuthChange((user) => {
+  if (user) syncNow();
+  else {
+    acct.step = "email";
+    acct.status = "idle";
+  }
+  if (S.sheet?.kind === "settings") S.sheet.dirty = true;
+  render();
+});
+
+function acctStatus() {
+  if (acct.status === "syncing") return "Syncing…";
+  if (acct.status === "error") return `Couldn't sync: ${esc(acct.syncError)}. Will retry.`;
+  if (acct.lastSync) return `Synced <span data-ago="${acct.lastSync}">${ago(acct.lastSync)}</span> · ${S.bets.length} bet${S.bets.length === 1 ? "" : "s"}`;
+  return "Waiting to sync…";
+}
+
+function accountHtml() {
+  const head = (title, sub) => `<div class="acct-h"><span class="acct-ico">${icons.cloud}</span><div><b>${title}</b><p class="muted small" id="acct-status">${sub}</p></div></div>`;
+  if (settings.demo) return `<div class="acct">${head("Sync across devices", "Turn off demo mode to sign in.")}</div>`;
+  if (!cloud.configured) return `<div class="acct">${head("Sync across devices", "Accounts aren't connected on this site yet.")}</div>`;
+  const u = cloud.currentUser();
+  if (u) {
+    return `<div class="acct on">${head(esc(u.email || "Signed in"), acctStatus())}
+      <div class="dactions"><button class="btn sm" data-act="sync-now" ${acct.status === "syncing" ? "disabled" : ""}>${icons.refresh} Sync now</button><span class="grow"></span><button class="btn sm ghost" data-act="sign-out">Sign out</button></div></div>`;
+  }
+  const err = acct.error ? `<p class="acct-err">${esc(acct.error)}</p>` : "";
+  if (acct.step === "code") {
+    return `<div class="acct">${head("Check your email", `We sent a 6-digit code to <b>${esc(acct.email)}</b>.`)}
+      <div class="acct-row"><input id="acct-code" class="acct-in code" inputmode="numeric" autocomplete="one-time-code" maxlength="8" placeholder="123456" aria-label="6-digit code">
+      <button class="btn primary" data-act="acct-verify" ${acct.busy ? "disabled" : ""}>${acct.busy ? "Checking…" : "Sign in"}</button></div>${err}
+      <p class="muted small">Wrong address? <button class="link" data-act="acct-back">Use a different email</button> · <button class="link" data-act="acct-send">Resend code</button></p></div>`;
+  }
+  return `<div class="acct">${head("Sync your phone and computer", "Sign in with your email and your bets stay in step on every device. No password; we email you a code.")}
+    <div class="acct-row"><input id="acct-email" class="acct-in" type="email" inputmode="email" autocomplete="email" placeholder="you@example.com" value="${esc(acct.email)}" aria-label="Email">
+    <button class="btn primary" data-act="acct-send" ${acct.busy ? "disabled" : ""}>${acct.busy ? "Sending…" : "Send code"}</button></div>${err}</div>`;
+}
+
+function paintAcct() {
+  const el = $("#acct");
+  if (el) swap(el, accountHtml());
+}
+
 // ───────────────────────────── rendering ─────────────────────────────
 
 const $ = (s, el = document) => el.querySelector(s);
@@ -704,6 +825,7 @@ function viewBets() {
         <button class="btn" data-act="tab" data-v="build">Build a slip</button>
         <button class="btn ghost" data-act="demo-on">Explore with demo data</button>
       </div>
+      ${CLOUD && !cloud.currentUser() ? `<p class="eh-sync">${icons.cloud} Already using hedgehog on another device? <button class="link" data-act="open-settings">Sign in to sync your bets</button></p>` : ""}
       ${dropZone()}
     </section>`;
   }
@@ -750,7 +872,10 @@ function viewBets() {
       : `<div class="empty">${S.f.betsTab === "open" ? "No open bets. Tap <b>Add pick</b> or build a slip." : "Nothing settled yet."}</div>`;
   }
   const page = `<div class="view-h page"><div><div class="eyebrow">Game day workspace</div><h1>College football</h1><p class="muted">Track straight bets and parlays alongside live scores.</p></div></div>`;
-  return `${page}${dropZone()}<div class="bets-grid">${hero}<div>${sweat}${tabs}${list}</div></div>`;
+  const syncBanner = CLOUD && !cloud.currentUser() && !settings.syncBannerDismissed
+    ? `<div class="notice sync-banner">${icons.cloud}<span><b>Keep your phone and computer in sync.</b> Sign in with your email; your bets follow you everywhere.</span><button class="btn sm primary" data-act="open-settings">Sign in</button><button class="icon-btn sm" data-act="dismiss-sync" aria-label="Dismiss">${icons.x}</button></div>`
+    : "";
+  return `${page}${syncBanner}${dropZone()}<div class="bets-grid">${hero}<div>${sweat}${tabs}${list}</div></div>`;
 }
 
 function groupByDay(arr, dateFn) {
@@ -1601,18 +1726,20 @@ function paintForm() {
 }
 
 function sheetSettings() {
+  const signedIn = CLOUD && cloud.currentUser();
   return `<div class="sheet-h"><h2>Settings</h2>${closeBtn()}</div>
+    <div id="acct">${accountHtml()}</div>
     <div class="set-row"><div><b>Default odds format</b><p class="muted small">Every price in the app switches; you can still type either kind anywhere.</p></div>${fmtToggle("set-fmt")}</div>
     <div class="set-row"><div><b>Unit size</b><p class="muted small">Default stake for new picks and slip previews.</p></div><label class="stake"><span>$</span><input id="set-unit" data-in="set-unit" inputmode="decimal" value="${esc(settings.unit)}"></label></div>
     <div class="set-row"><div><b>Auto-accept line changes</b><p class="muted small">When a price in your slip moves, take the new number instead of asking.</p></div><label class="switch ${settings.autoAccept ? "on" : ""}"><input type="checkbox" data-act="set-auto" ${settings.autoAccept ? "checked" : ""}><span class="knob"></span></label></div>
     <div class="set-row"><div><b>Demo mode</b><p class="muted small">Simulated slate with games that go live and finish while you watch, plus sample bets. Your real bets are kept separately and untouched.</p></div><label class="switch ${settings.demo ? "on" : ""}"><input type="checkbox" data-act="set-demo" ${settings.demo ? "checked" : ""}><span class="knob"></span></label></div>
     <h3 class="sh3">Your data</h3>
-    <p class="muted small">Bets live in this browser only. Export a backup to move them to another device.</p>
+    <p class="muted small">${signedIn ? "Your bets are saved on this device and in your account. Export a JSON backup any time." : "Bets live in this browser only. Sign in above to sync them, or export a backup."}</p>
     <div class="dactions">
       <button class="btn sm" data-act="export">Export JSON</button>
       <label class="btn sm">Import JSON<input type="file" accept="application/json,.json" data-change="import" hidden></label>
       <span class="grow"></span>
-      <button class="btn sm danger" data-act="wipe">${S.confirmDelete === "wipe" ? "Tap again to erase all bets" : "Erase all bets"}</button>
+      <button class="btn sm danger" data-act="wipe">${S.confirmDelete === "wipe" ? (signedIn ? "Tap again: erases on every device" : "Tap again to erase all bets") : "Erase all bets"}</button>
     </div>
     <p class="muted small foot">Scores, schedule, lines and news come from ESPN's public feeds. hedgehog is for tracking and fun — it doesn't place bets.</p>`;
 }
@@ -1933,6 +2060,66 @@ const actions = {
     a.click();
     setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   },
+  "acct-send": async () => {
+    const email = ($("#acct-email")?.value ?? acct.email).trim();
+    if (!/^\S+@\S+\.\S+$/.test(email)) {
+      acct.error = "Enter your email address";
+      return paintAcct();
+    }
+    acct.email = email;
+    acct.busy = true;
+    acct.error = "";
+    paintAcct();
+    try {
+      await cloud.sendCode(email);
+      acct.step = "code";
+    } catch (e) {
+      acct.error = e.message;
+    }
+    acct.busy = false;
+    paintAcct();
+    setTimeout(() => $("#acct-code")?.focus(), 30);
+  },
+  "acct-verify": async () => {
+    const code = ($("#acct-code")?.value || "").replace(/\D/g, "");
+    if (code.length < 6) {
+      acct.error = "Enter the 6-digit code from the email";
+      return paintAcct();
+    }
+    acct.busy = true;
+    acct.error = "";
+    paintAcct();
+    try {
+      await cloud.verifyCode(acct.email, code);
+      acct.step = "email";
+      toast("Signed in. Syncing your bets…", "won");
+    } catch (e) {
+      acct.error = e.message;
+    }
+    acct.busy = false;
+    paintAcct();
+  },
+  "acct-back": () => {
+    acct.step = "email";
+    acct.error = "";
+    paintAcct();
+  },
+  "sync-now": () => syncNow({ announce: true }),
+  "sign-out": async () => {
+    if (S.confirmDelete !== "signout") {
+      S.confirmDelete = "signout";
+      $('[data-act="sign-out"]').textContent = "Tap again to sign out";
+      return;
+    }
+    S.confirmDelete = null;
+    await cloud.signOut();
+    toast("Signed out. Your bets stay on this device.");
+  },
+  "dismiss-sync": () => {
+    settings.syncBannerDismissed = true;
+    saveSettings();
+    render();
+  },
   wipe: () => {
     if (S.confirmDelete !== "wipe") {
       S.confirmDelete = "wipe";
@@ -2103,6 +2290,10 @@ document.addEventListener("input", (e) => {
 });
 
 document.addEventListener("keydown", (e) => {
+  if (e.key === "Enter" && (e.target.id === "acct-email" || e.target.id === "acct-code")) {
+    e.preventDefault();
+    actions[e.target.id === "acct-email" ? "acct-send" : "acct-verify"]();
+  }
   if (e.key === "Escape" && S.sheet) {
     S.sheet = null;
     render();
@@ -2204,8 +2395,12 @@ window.addEventListener("hashchange", () => {
 });
 
 document.addEventListener("visibilitychange", () => {
-  if (!document.hidden) tick();
+  if (!document.hidden) {
+    tick();
+    syncNow();
+  }
 });
+window.addEventListener("online", () => syncNow());
 
 // Keep data from other tabs in sync (e.g. bet added in another window).
 window.addEventListener("storage", (e) => {
@@ -2226,8 +2421,11 @@ function boot() {
   $("#dropover .dz-ico").innerHTML = icons.upload;
   $("#today-top").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
   loadCache();
-  // Legs from old slip state must still point at games; drop dead ones silently.
   render();
+  if (CLOUD) {
+    cloud.sessionFromUrl().then((did) => did && toast("Signed in. Syncing your bets…", "won")).catch((e) => toast(e.message, "err"));
+    if (cloud.currentUser()) syncNow();
+  }
   tick(true);
   setInterval(tick, 5000);
   // Installed-app support (Add to Home Screen): offline shell + faster launches.
