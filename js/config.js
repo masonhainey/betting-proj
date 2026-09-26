@@ -4,5 +4,5 @@
 // to commit. Never put the service_role key here.
 //
 // Leave these empty and hedgehog runs exactly as before: local-only, no sign-in.
-export const SUPABASE_URL = "";
+export const SUPABASE_URL = "https://vcmgdhmhizyqjnyjxmcl.supabase.co";
 export const SUPABASE_ANON_KEY = "";
