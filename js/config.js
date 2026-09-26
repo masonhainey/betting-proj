@@ -5,4 +5,4 @@
 //
 // Leave these empty and hedgehog runs exactly as before: local-only, no sign-in.
 export const SUPABASE_URL = "https://vcmgdhmhizyqjnyjxmcl.supabase.co";
-export const SUPABASE_ANON_KEY = "";
+export const SUPABASE_ANON_KEY = "sb_publishable_uKY0eEvFEDrBlD_jpOzEPA_MAb1PSLw";
