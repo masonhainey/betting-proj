@@ -111,8 +111,8 @@ function eventFor(g) {
   const gameMin = ((now - g.kick.getTime()) / 60000) * speed * (60 / GAME_MIN);
   let state = "pre", completed = false, period = 0, clock = "0:00";
   let hs = null, as = null;
-  const [hid, habbr, hshort, hname, hcol, halt, hr] = g.home;
-  const [aid, aabbr, ashort, aname, acol, aalt, ar] = g.away;
+  const [hid, habbr, hshort, hname, _hcol, _halt, hr] = g.home;
+  const [aid, aabbr, _ashort, aname, _acol, _aalt, ar] = g.away;
   if (gameMin >= 0) {
     const plays = scoringPlays(g.seed, hr, ar);
     const upto = Math.min(gameMin, 60);

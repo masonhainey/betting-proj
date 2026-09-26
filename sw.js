@@ -1,12 +1,15 @@
 // Offline shell for the installed app. Network-first (and revalidated) for our own files
 // so updates show up on the next launch; the cache only answers when there's no connection. ESPN, fonts and
 // the OCR library always go straight to the network.
-const CACHE = "hedgehog-v5";
+const CACHE = "hedgehog-v6";
 const SHELL = [
-  "./", "index.html", "styles.css", "manifest.webmanifest",
-  "js/app.js", "js/espn.js", "js/demo.js", "js/odds.js", "js/grade.js", "js/store.js",
-  "js/ui.js", "js/news.js", "js/slipparse.js", "js/ocr.js", "js/config.js", "js/cloud.js", "js/sync.js",
-  "icons/icon-192.png", "icons/apple-touch-icon.png",
+  "./", "index.html", "styles.css", "manifest.webmanifest", "js/account.js", "js/app.js",
+  "js/cloud.js", "js/config.js", "js/data.js", "js/demo.js", "js/espn.js", "js/events.js",
+  "js/grade.js", "js/market.js", "js/news.js", "js/ocr.js", "js/odds.js", "js/render.js",
+  "js/sheets/add.js", "js/sheets/bet.js", "js/sheets/game.js", "js/sheets/import.js",
+  "js/sheets/settings.js", "js/slipparse.js", "js/state.js", "js/store.js", "js/sync.js",
+  "js/ui.js", "js/views/bets.js", "js/views/build.js", "js/views/live.js", "js/views/news.js",
+  "js/views/schedule.js", "icons/icon-192.png", "icons/apple-touch-icon.png",
 ];
 
 self.addEventListener("install", (e) => {

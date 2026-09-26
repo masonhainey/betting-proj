@@ -68,20 +68,30 @@ To skip the confirmation email on sign-up, turn off **Authentication → Sign In
 ## Layout
 
 ```
-index.html, styles.css
-js/app.js     state, polling, views, events
-js/espn.js    ESPN fetch + normalization (handles both odds formats ESPN has shipped)
-js/odds.js    American/decimal/fractional parsing, stepping, parlay, hedge, no-vig
-js/grade.js   bet model, live leg status, auto-grading, stats
-js/cloud.js   Supabase sign-in (email + password) + records table over fetch
-js/sync.js    local-first sync: change detection, tombstones, last-write-wins merge
-js/config.js  Supabase project URL + anon key (empty = local-only)
-js/news.js    headline tagging
-js/slipparse.js  bet-slip text → draft bet; matches picks to games
-js/ocr.js     lazy-loaded Tesseract.js OCR with dark-mode image cleanup
-js/demo.js    simulated data source with the same interface as espn.js
-supabase/     schema.sql to paste into Supabase
-tests/        node --test
+index.html, styles.css, manifest.webmanifest, sw.js (offline shell for the installed app)
+js/app.js          entry point: boot
+js/state.js        shared state, settings, save helpers, DOM utilities (imports no app modules)
+js/data.js         ESPN/demo refresh, caching, kickoff + line tracking, auto-grading, polling
+js/market.js       odds board markets, market sim, bet slip
+js/account.js      accounts & sync controller + account UI
+js/render.js       top-level render, sheet host, shared UI components
+js/events.js       click/input/keyboard handlers, drag & drop, paste, routing
+js/views/*.js      Bets, Live, Upcoming (schedule), Build, News tabs
+js/sheets/*.js     game, bet, add-a-pick, import, settings sheets
+js/espn.js         ESPN fetch + normalization (handles both odds formats ESPN has shipped)
+js/odds.js         American/decimal/fractional parsing, stepping, parlay, hedge, no-vig
+js/grade.js        bet model, live leg status, auto-grading, stats
+js/slipparse.js    bet-slip text → draft bet; matches picks to games
+js/ocr.js          lazy-loaded Tesseract.js OCR with dark-mode image cleanup
+js/cloud.js        Supabase sign-in (email + password) + records table over fetch
+js/sync.js         local-first sync: change detection, tombstones, last-write-wins merge
+js/config.js       Supabase project URL + publishable key
+js/news.js         headline tagging
+js/demo.js         simulated data source with the same interface as espn.js
+supabase/          schema.sql to paste into Supabase
+tests/             node --test
 ```
+
+`npm run lint` checks every module for undefined names and unused imports; CI runs it with the tests.
 
 Without an account, bets are stored only in the browser. Use **Settings → Export/Import JSON** to back them up or move them between devices.
