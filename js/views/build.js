@@ -110,7 +110,7 @@ export function slipHtml() {
       </div>`
     : "";
   return `<div class="slip">
-    <div class="slip-h"><h2>Slip <em>${n}</em></h2>${fmtToggle("set-fmt")}<button class="link" data-act="slip-clear">Clear</button></div>
+    <div class="slip-h"><h2>Slip <em>${n}</em></h2>${fmtToggle("set-fmt")}<button class="link" data-act="share-slip">Share</button><button class="link" data-act="slip-clear">Clear</button></div>
     ${tabs}
     <div class="slegs">${legs}</div>
     <button class="btn sm ghost add-custom" data-act="slip-custom">+ Custom selection</button>

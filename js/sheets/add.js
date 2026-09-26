@@ -32,6 +32,7 @@ export function openAdd(prefill) {
     ticket: "",
     link: "",
     source: null,
+    tail: null,
   };
   if (prefill?.gameId) {
     S.form.linking = S.form.legs[0].id;
@@ -173,6 +174,7 @@ export function saveForm() {
     legs: legs.map((l) => ({ id: uid(), pick: l.pick.trim(), odds: l.odds, status: "open", gameId: l.gameId, market: l.market, side: l.side, line: l.line, gameLabel: l.gameLabel, kickoff: l.kickoff })),
   };
   if (f.ghost) bet.ghost = true;
+  if (f.tail) bet.tail = f.tail;
   if (num(f.ticket) > 0 && f.lastEdited !== "win") bet.ticketPayout = Math.round(num(f.ticket) * 100) / 100;
   if (f.link) bet.link = f.link;
   if (f.type === "parlay") {

@@ -1,5 +1,6 @@
 // User input: click/input/change/keyboard handlers, drag & drop, paste, routing.
 
+import { shareActions, shareInputs, handleTailLink } from "./sheets/share.js";
 import { ymd } from "./espn.js";
 import { americanToDecimal, parseOdds, formatOdds, stepOdds, hedge, fmtMoney } from "./odds.js";
 import { betStatus, potentialPayout, legLabel } from "./grade.js";
@@ -27,6 +28,7 @@ export function formLeg(id) {
 }
 
 export const actions = {
+  ...shareActions,
   tab: (el) => {
     location.hash = el.dataset.v;
   },
@@ -430,6 +432,7 @@ export const actions = {
 };
 
 export const inputs = {
+  ...shareInputs,
   "sched-q": (el) => {
     S.f.q = el.value;
     render();
@@ -694,6 +697,7 @@ export function handleAuthLink() {
 
 window.addEventListener("hashchange", () => {
   if (handleAuthLink()) return;
+  if (handleTailLink()) return;
   const t = location.hash.slice(1);
   if (TABS.includes(t)) {
     S.tab = t;

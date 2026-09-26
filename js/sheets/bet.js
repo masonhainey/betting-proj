@@ -28,7 +28,7 @@ export function sheetBet() {
   }).join("");
   return `<div class="sheet-h"><h2>${isParlay ? `${b.legs.length}-leg parlay` : "Straight bet"}</h2>${closeBtn()}</div>
     <div class="dhead">
-      ${pill(st)}<span class="muted">${esc(b.book || "No book")} · ${b.ghost ? "tracked" : "placed"} ${esc(fmtDayTime(b.createdAt))}</span>
+      ${pill(st)}<span class="muted">${esc(b.book || "No book")} · ${b.ghost ? "tracked" : "placed"} ${esc(fmtDayTime(b.createdAt))}${b.tail ? ` · tailed from ${esc(b.tail.from || "a friend")}` : ""}</span>
     </div>
     ${b.ghost ? `<div class="notice ghost-note"><span><b>👻 Ghost bet.</b> Tracked like a real bet but kept out of your P/L.</span><button class="btn sm" data-act="toggle-ghost" data-id="${b.id}">I placed it</button></div>` : ""}
     ${autopsyLine(b, st)}
@@ -53,6 +53,7 @@ export function sheetBet() {
     <h3 class="sh3">Notes</h3>
     <textarea id="bet-note" data-in="bet-note" data-id="${b.id}" rows="2" placeholder="Why you liked it, who tipped you, etc.">${esc(b.note || "")}</textarea>
     <div class="dactions">
+      <button class="btn sm primary" data-act="share-bet" data-id="${b.id}">${icons.ext} Share</button>
       ${b.link ? `<a class="btn sm" href="${esc(b.link)}" target="_blank" rel="noopener">${icons.ext} Open on ${esc(b.book || "your book")}</a>` : ""}
       ${b.legs.some((l) => l.gameId) ? `<button class="btn sm" data-act="rebuild" data-id="${b.id}">Rebuild in slip</button>` : ""}
       ${b.ghost ? "" : `<button class="btn sm" data-act="toggle-ghost" data-id="${b.id}" title="Keep tracking it, but leave it out of your P/L">Make it a ghost</button>`}

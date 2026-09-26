@@ -148,6 +148,7 @@ export function betCard(b) {
       <span class="btype ${isParlay ? "parlay" : ""}">${isParlay ? `${b.legs.length}-leg parlay` : "Straight"}</span>
       ${b.book ? `<span class="book">${esc(b.book)}</span>` : ""}
       ${b.boostPct ? `<span class="boost">+${b.boostPct}% boost</span>` : ""}
+      ${b.tail ? `<span class="tail-tag" title="Tailed from a shared link">↪ ${esc(b.tail.from || "friend")}</span>` : ""}
       <span class="grow"></span>
       <span class="bodds">${odds(d)}</span>
     </header>
@@ -188,6 +189,7 @@ export function insightsHtml() {
     ${table("By market", breakdown(bets, marketOf))}
     ${table("By odds range", breakdown(bets, oddsBucket).sort((a, b) => ["-150 or shorter", "-150 to +110", "+110 to +300", "+300 and up"].indexOf(a.key) - ["-150 or shorter", "-150 to +110", "+110 to +300", "+300 and up"].indexOf(b.key)))}
     ${table("By book", breakdown(bets, (b) => b.book || "Unspecified"))}
+    ${bets.some((b) => b.tail) ? table("By source", breakdown(bets, (b) => (b.tail ? `Tailing ${b.tail.from || "a friend"}` : "Your own picks"))) : ""}
   </div>`;
 }
 

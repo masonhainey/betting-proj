@@ -47,6 +47,13 @@ Open bets have manual grading per leg, cash-out, a hedge calculator and notes.
 
 A lost parlay's detail view also names the leg or legs that sank it.
 
+**Share & tail.** Tap **Share** on any bet, or **Share** on the Build slip for picks you haven't placed yet.
+- You get a link plus a share-card image, through the iPhone share menu or copied to the clipboard.
+- Your stake is hidden unless you turn it on.
+- Friends who open the link see your ticket with live scores, then **Tail it** (the Add form opens filled in, so they just add a stake) or **Ghost it**.
+- Nothing goes through a server: the ticket is encoded in the link, and everything decoded from a link is validated and escaped.
+- Tailed bets are tagged with who they came from, and Insights adds a **By source** table showing whose picks make you money.
+
 **Import a slip.** Drop a screenshot onto the page, paste one, or pick one from your photos. You can also paste the share text or link your book gives you.
 - Screenshots are read in the browser with [Tesseract.js](https://github.com/naptha/tesseract.js). It's downloaded from jsDelivr the first time (~12 MB), and the image never leaves your device.
 - hedgehog pulls out the book, legs, odds, stake and payout, and matches each pick to a real game so it tracks live and auto-grades. You review everything before it's saved.
@@ -95,6 +102,8 @@ js/espn.js         ESPN fetch + normalization (handles both odds formats ESPN ha
 js/odds.js         American/decimal/fractional parsing, stepping, parlay, hedge, no-vig
 js/grade.js        bet model, live leg status, auto-grading, stats
 js/autopsy.js      ghost bets report + parlay autopsy
+js/share.js        share-link encode/decode (validated) + share text
+js/sharecard.js    share-card image (canvas)
 js/slipparse.js    bet-slip text → draft bet; matches picks to games
 js/ocr.js          lazy-loaded Tesseract.js OCR with dark-mode image cleanup
 js/cloud.js        Supabase sign-in (email + password) + records table over fetch

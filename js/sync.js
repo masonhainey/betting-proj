@@ -10,7 +10,7 @@
 // an in-memory fake in tests.
 
 const SETTINGS_ID = "settings";
-export const SYNCED_SETTINGS = ["oddsFormat", "unit", "lastBook"];
+export const SYNCED_SETTINGS = ["oddsFormat", "unit", "lastBook", "shareName"];
 
 export const emptyMeta = (userId) => ({ userId, lastPull: null, hashes: {}, dirty: {}, tombs: {}, settingsHash: null, settingsAt: null });
 

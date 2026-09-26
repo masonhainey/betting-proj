@@ -1,5 +1,6 @@
 // Entry point.
 
+import { handleTailLink } from "./sheets/share.js";
 import * as cloud from "./cloud.js";
 import { icons } from "./ui.js";
 import { CLOUD, syncNow } from "./account.js";
@@ -20,6 +21,7 @@ function boot() {
   $("#today-top").textContent = new Date().toLocaleDateString("en-US", { weekday: "long", month: "short", day: "numeric" });
   loadCache();
   render();
+  handleTailLink();
   if (CLOUD) {
     handleAuthLink();
     if (cloud.currentUser()) syncNow();

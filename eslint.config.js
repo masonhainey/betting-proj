@@ -3,7 +3,7 @@ const browser = Object.fromEntries(
   ["window", "document", "navigator", "location", "history", "localStorage", "sessionStorage", "fetch", "setTimeout", "clearTimeout",
    "setInterval", "clearInterval", "console", "URL", "URLSearchParams", "Blob", "FileReader", "Image", "matchMedia", "getComputedStyle",
    "CSS", "Intl", "DataTransfer", "ClipboardEvent", "Event", "Notification", "caches", "self", "structuredClone", "createImageBitmap",
-   "AbortController", "Request", "Response", "requestAnimationFrame"].map((k) => [k, "readonly"])
+   "AbortController", "Request", "Response", "requestAnimationFrame", "TextEncoder", "TextDecoder", "btoa", "atob", "File", "Path2D"].map((k) => [k, "readonly"])
 );
 
 export default [

@@ -1,5 +1,6 @@
 // Top-level render, sheets host, status painting, and shared UI components.
 
+import { sheetShare, sheetTail } from "./sheets/share.js";
 import { fmtMoney } from "./odds.js";
 import { betStatus } from "./grade.js";
 import { esc, fmtTime, fmtDayTime, ago, logo, rank, icons, winProb, pct, wpBar } from "./ui.js";
@@ -39,9 +40,9 @@ export function renderSheet() {
   }
   const k = S.sheet.kind;
   // Forms render once and update in place; live sheets re-render every refresh.
-  if (root.dataset.kind === k && root.dataset.key === (S.sheet.id || "") && (k === "add" || k === "settings" || k === "import") && !S.sheet.dirty) return;
+  if (root.dataset.kind === k && root.dataset.key === (S.sheet.id || "") && (k === "add" || k === "settings" || k === "import" || k === "share") && !S.sheet.dirty) return;
   S.sheet.dirty = false;
-  const body = { add: sheetAdd, bet: sheetBet, game: sheetGame, settings: sheetSettings, import: sheetImport, slip: () => `<div class="sheet-h"><h2>Bet slip</h2>${closeBtn()}</div>${slipHtml()}` }[k]();
+  const body = { add: sheetAdd, bet: sheetBet, game: sheetGame, settings: sheetSettings, import: sheetImport, share: sheetShare, tail: sheetTail, slip: () => `<div class="sheet-h"><h2>Bet slip</h2>${closeBtn()}</div>${slipHtml()}` }[k]();
   root.dataset.kind = k;
   root.dataset.key = S.sheet.id || "";
   if (root.hidden) {
