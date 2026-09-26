@@ -54,6 +54,9 @@ const DARK = typeof matchMedia === "function" && matchMedia("(prefers-color-sche
 
 /** ESPN logo URL for a team, preferring the dark-background variant in dark mode. */
 export function logoUrl(t) {
+  // ESPN normally sends the logo. If not, build it: NFL logos go by abbreviation, college by
+  // team id. (Never mix them up: NFL and college team ids overlap.)
+  if (t.league === "nfl") return t.logo || (t.abbr ? `https://a.espncdn.com/i/teamlogos/nfl/500/${t.abbr.toLowerCase()}.png` : "");
   const base = t.logo || (/^\d+$/.test(t.id || "") ? `https://a.espncdn.com/i/teamlogos/ncaa/500/${t.id}.png` : "");
   return DARK ? base.replace("/ncaa/500/", "/ncaa/500-dark/") : base;
 }

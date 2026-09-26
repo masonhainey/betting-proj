@@ -103,7 +103,7 @@ const num = (v) => {
   return Number.isFinite(n) ? n : null;
 };
 
-function team(c) {
+function team(c, sport = "cfb") {
   if (!c) return null;
   const t = c.team || {};
   const rank = c.curatedRank?.current;
@@ -119,6 +119,7 @@ function team(c) {
     rank: rank && rank <= 25 ? rank : null,
     record: c.records?.find((r) => r.type === "total")?.summary || c.records?.[0]?.summary || "",
     winner: !!c.winner,
+    league: sport,
   };
 }
 
@@ -161,8 +162,8 @@ export function normalizeOdds(o, home, away) {
 export function normalizeEvent(ev, sport = "cfb") {
   const comp = ev?.competitions?.[0];
   if (!comp) return null;
-  const home = team(comp.competitors?.find((c) => c.homeAway === "home"));
-  const away = team(comp.competitors?.find((c) => c.homeAway === "away"));
+  const home = team(comp.competitors?.find((c) => c.homeAway === "home"), sport);
+  const away = team(comp.competitors?.find((c) => c.homeAway === "away"), sport);
   if (!home || !away) return null;
   const st = comp.status || ev.status || {};
   const type = st.type || {};

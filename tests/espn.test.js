@@ -71,3 +71,13 @@ test("each league has its own ESPN feed, and games remember their league", async
   assert.equal(normalizeEvent(ev, "nfl").sport, "nfl");
   assert.equal(normalizeEvent(ev).sport, "cfb");
 });
+
+test("team logos: ESPN's when sent, otherwise the right league's", async () => {
+  const { logoUrl } = await import("../js/ui.js");
+  const nfl = normalizeEvent({ id: 8, competitions: [{ competitors: [comp("home", "12", "KC"), comp("away", "2", "BUF")] }] }, "nfl");
+  assert.equal(nfl.home.league, "nfl");
+  assert.equal(logoUrl(nfl.home), "https://a.espncdn.com/i/teamlogos/nfl/500/kc.png", "not college team #12");
+  assert.equal(logoUrl({ ...nfl.home, logo: "https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/kc.png" }), "https://a.espncdn.com/i/teamlogos/nfl/500/scoreboard/kc.png");
+  const cfb = normalizeEvent({ id: 9, competitions: [{ competitors: [comp("home", "333", "ALA"), comp("away", "61", "UGA")] }] });
+  assert.match(logoUrl(cfb.home), /teamlogos\/ncaa\/500(-dark)?\/333\.png$/);
+});
