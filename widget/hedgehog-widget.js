@@ -32,6 +32,7 @@ var SUPABASE_URL = "https://vcmgdhmhizyqjnyjxmcl.supabase.co";
 var SUPABASE_ANON_KEY = "sb_publishable_uKY0eEvFEDrBlD_jpOzEPA_MAb1PSLw";
 
 // js/espn.js
+var etDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(d)).replaceAll("-", "");
 var num = (v) => {
   if (v == null || v === "") return null;
   if (typeof v === "string" && /^(ev|even)$/i.test(v.trim())) return 100;
@@ -246,7 +247,6 @@ function legLive(leg, game) {
 var MIN = 6e4;
 var LOOKBACK_DAYS = 2;
 var LOOKAHEAD_DAYS = 8;
-var etDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(d)).replaceAll("-", "");
 var inPlay = (bets) => bets.filter((b) => !b.ghost && Array.isArray(b.legs) && b.legs.length);
 function daysToFetch(bets, now = /* @__PURE__ */ new Date()) {
   const t = now.getTime();

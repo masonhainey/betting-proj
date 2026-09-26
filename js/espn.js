@@ -26,6 +26,10 @@ async function getJSON(url, { timeout = 12000, retries = 1 } = {}) {
 export const ymd = (d) =>
   `${d.getFullYear()}${String(d.getMonth() + 1).padStart(2, "0")}${String(d.getDate()).padStart(2, "0")}`;
 
+/** ESPN buckets games by US Eastern date, wherever you are. */
+export const etDay = (d) =>
+  new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(d)).replaceAll("-", "");
+
 export async function fetchScoreboard(dates, { groups = FBS } = {}) {
   const url = `${BASE}/scoreboard?dates=${dates}&groups=${groups}&limit=500`;
   const data = await getJSON(url);

@@ -7,7 +7,7 @@
 // Push signing (VAPID) keys are created on first run and kept in Supabase (app_secrets),
 // so no other secrets are needed.
 
-import { fetchScoreboard } from "../js/espn.js";
+import { etDay, fetchScoreboard } from "../js/espn.js";
 import { computeServerEvents } from "../js/alertrules.js";
 
 const MAX_PER_USER = 6; // never flood someone (e.g. first run after days away)
@@ -34,8 +34,7 @@ export function supabase(url, key, fetchImpl = fetch) {
   };
 }
 
-/** ESPN buckets games by US Eastern date, whatever timezone this runs in. */
-export const etDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(d)).replaceAll("-", "");
+export { etDay };
 
 export async function run({ db, send, generateKeys, fetchGames = defaultFetchGames, now = new Date(), log = console.log }) {
   // 1. Push signing keys (made once, kept server-side).

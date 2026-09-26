@@ -3,14 +3,13 @@
 
 import { betStatus, betProfit, gradeLeg, legLabel, legLive, potentialPayout, ticketDecimal } from "../../js/grade.js";
 import { formatOdds, fmtMoney } from "../../js/odds.js";
+import { etDay } from "../../js/espn.js";
 
 const MIN = 60e3;
 const LOOKBACK_DAYS = 2;
 const LOOKAHEAD_DAYS = 8;
 
-/** ESPN buckets games by US Eastern date. */
-export const etDay = (d) =>
-  new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(d)).replaceAll("-", "");
+export { etDay };
 
 /** Real (not ghost) bets that still have a leg in play, plus ones that may have settled today. */
 const inPlay = (bets) => bets.filter((b) => !b.ghost && Array.isArray(b.legs) && b.legs.length);

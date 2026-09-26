@@ -280,6 +280,10 @@ function tidyPick(p) {
 
 const norm = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9& ]/g, " ").replace(/\s+/g, " ").trim();
 
+// Props, team totals and partial-game lines can't be graded from the final score, so they
+// link to their game (for live context) but never to a gradeable market.
+export const PROPISH = /\b(yds|yards?|tds?|touchdowns?|receptions?|rec|rush(ing)?|pass(ing)?|sacks?|tackles?|interceptions?|ints?|completions?|attempts?|team total|tt|1st|2nd|3rd|4th|first|second|half|1h|2h|quarter|q[1-4]|alt|anytime|player|longest|field goals?|fgs?|margin|exact|race)\b/i;
+
 const escRe = (s) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
 
 /** Length of the longest name of team t found in the pick (0 if none), plus the matched text. */
@@ -328,6 +332,7 @@ export function linkPick(pick, games, context = "", now = Date.now()) {
   } else hit = byPick;
   if (!hit) return null;
   const { g } = hit;
+  if (PROPISH.test(pick)) return { gameId: g.id, market: "other" };
   const p = norm(pick).replace(/ml\b/, " ml ");
   const tot = pick.match(/\b(over|under|o|u)\s?(\d{1,3}(?:\.5)?)\b/i);
   if (tot) return { gameId: g.id, market: "total", side: /^o/i.test(tot[1]) ? "over" : "under", line: Number(tot[2]) };

@@ -1,9 +1,10 @@
 // Feed refreshing (ESPN or demo), caching, kickoff/line tracking, auto-grading, polling.
 
 import { alertsForGraded, watchGames, alertsOn } from "./alerts.js";
-import { ymd, addDays } from "./espn.js";
+import { ymd, addDays, etDay } from "./espn.js";
 import { americanToDecimal, fmtMoney } from "./odds.js";
 import { betStatus, betProfit, legLabel, autoGrade } from "./grade.js";
+import { needsLink, relinkLegs } from "./relink.js";
 import * as cloud from "./cloud.js";
 import { load, save, uid } from "./store.js";
 import { tagArticle } from "./news.js";
@@ -60,7 +61,9 @@ export function pruneTracking() {
 }
 
 export function afterData() {
+  const linked = relinkLegs(S.bets, [...S.games.values()]);
   const changed = autoGrade(S.bets, game);
+  if (linked.length && !changed.length) saveBets();
   alertsForGraded(changed);
   watchGames();
   if (changed.length) {
@@ -130,18 +133,32 @@ export async function refreshSchedule() {
   afterData();
 }
 
-/** Open bets on games from earlier days (e.g. a late game you haven't seen graded). */
+/**
+ * Scores for open bets that today's scoreboard doesn't cover: games from earlier days,
+ * late games ESPN files under yesterday's date, and days an unlinked pick might be on.
+ */
+const looked = new Set(); // days already searched for unlinked picks this session
 export async function refreshBetGames() {
   const st = S.st.betGames;
-  const today = dayKey(new Date());
+  const now = Date.now();
   const days = new Set();
+  const today = new Set(S.todayIds);
   for (const b of S.bets) {
     if (betStatus(b) !== "open") continue;
     for (const l of b.legs) {
-      if (l.status !== "open" || !l.gameId || !l.kickoff) continue;
-      const g = game(l.gameId);
-      const k = dayKey(l.kickoff);
-      if (k < today && (!g || g.state !== "post") && Date.now() - new Date(l.kickoff) < 14 * 864e5) days.add(k.replaceAll("-", ""));
+      if (l.status !== "open") continue;
+      if (l.gameId && l.kickoff) {
+        const g = game(l.gameId);
+        const t = Date.parse(g?.date || l.kickoff);
+        if (t <= now && now - t < 14 * 864e5 && g?.state !== "post" && !today.has(l.gameId)) days.add(etDay(t));
+      } else if (needsLink(l)) {
+        // Look through the days from when it was placed up to yesterday (today and later are loaded anyway).
+        const placed = Date.parse(b.createdAt) || now;
+        for (let t = Math.max(placed - 864e5, now - 7 * 864e5); t < now - 864e5 / 2; t += 864e5) {
+          const d = etDay(t);
+          if (!looked.has(d)) days.add(d), looked.add(d);
+        }
+      }
     }
   }
   if (!days.size) return;
