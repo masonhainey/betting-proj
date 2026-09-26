@@ -175,6 +175,7 @@ export function trackSlip() {
   const c = slipCalc();
   const book = S.slip.book?.trim() || "";
   const now = new Date().toISOString();
+  const ghost = S.slip.ghost ? { ghost: true } : {};
   const mkLeg = (l) => ({ id: uid(), pick: l.pick, odds: l.odds, status: "open", gameId: l.gameId, market: l.market, side: l.side, line: l.line, gameLabel: l.gameLabel, kickoff: l.kickoff });
   let added = 0;
   const unnamed = c.legs.find((l) => l.custom && !l.pick.trim());
@@ -185,22 +186,23 @@ export function trackSlip() {
     if (c.conflict) return toast("Two legs on the same market of one game can't be parlayed", "err");
     if (!(c.stake > 0)) return toast("Enter a stake", "err");
     const override = parseOdds(S.slip.override)?.decimal;
-    S.bets.unshift({ id: uid(), createdAt: now, type: "parlay", stake: c.stake, book, legs: c.legs.map(mkLeg), oddsOverride: override > 1 ? override : null, boostPct: num(S.slip.boost) || 0, ...(c.ticket > 0 ? { ticketPayout: c.ticket } : {}) });
+    S.bets.unshift({ id: uid(), createdAt: now, type: "parlay", stake: c.stake, book, legs: c.legs.map(mkLeg), oddsOverride: override > 1 ? override : null, boostPct: num(S.slip.boost) || 0, ...(c.ticket > 0 ? { ticketPayout: c.ticket } : {}), ...ghost });
     added = 1;
   } else {
     for (const l of c.legs) {
       const st = num(S.slip.stakes[l.id]);
       if (!(st > 0)) continue;
-      S.bets.unshift({ id: uid(), createdAt: now, type: "straight", stake: st, book, legs: [mkLeg(l)] });
+      S.bets.unshift({ id: uid(), createdAt: now, type: "straight", stake: st, book, legs: [mkLeg(l)], ...ghost });
       added++;
     }
     if (!added) return toast("Enter a stake on at least one selection", "err");
   }
   if (book) settings.lastBook = book, saveSettings();
   saveBets();
-  S.slip = { mode: S.slip.mode, legs: [], stakes: {}, stake: settings.unit, override: "", boost: "", ticket: "", book };
+  S.slip = { mode: S.slip.mode, legs: [], stakes: {}, stake: settings.unit, override: "", boost: "", ticket: "", book, ghost: S.slip.ghost };
   saveSlip();
   if (S.sheet?.kind === "slip") S.sheet = null;
-  toast(added > 1 ? `Tracking ${added} bets` : "Bet tracked — it's on your Bets tab", "won");
+  if (ghost.ghost) S.f.betsTab = "ghosts";
+  toast(ghost.ghost ? `👻 Tracking ${added > 1 ? `${added} passes` : "your pass"} on the Ghosts tab` : added > 1 ? `Tracking ${added} bets` : "Bet tracked. It's on your Bets tab", "won");
   render();
 }

@@ -30,7 +30,32 @@ export const actions = {
   tab: (el) => {
     location.hash = el.dataset.v;
   },
-  "open-add": () => openAdd(),
+  "open-add": (el) => {
+    openAdd();
+    if (el?.dataset?.ghost) {
+      S.form.ghost = true;
+      S.sheet.dirty = true;
+      render();
+    }
+  },
+  "form-ghost": (el) => {
+    S.form.ghost = el.checked;
+    el.closest(".switch")?.classList.toggle("on", el.checked);
+    paintForm();
+  },
+  "slip-ghost": (el) => {
+    S.slip.ghost = el.checked;
+    saveSlip();
+    render();
+  },
+  "toggle-ghost": (el) => {
+    const b = findBet(el.dataset.id);
+    b.ghost = !b.ghost;
+    if (!b.ghost) delete b.ghost;
+    saveBets();
+    toast(b.ghost ? "👻 Now a ghost: tracked, but out of your P/L" : "Moved to your real bets", "won");
+    render();
+  },
   "pick-image": () => $("#slip-file").click(),
   "open-import-text": () => handleText(""),
   "imp-continue": () => openDraft(),

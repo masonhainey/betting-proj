@@ -73,7 +73,8 @@ export function afterData() {
       const p = betProfit(b);
       const st = betStatus(b);
       const what = b.legs.length > 1 ? `${b.legs.length}-leg parlay` : legLabel(b.legs[0], game(b.legs[0].gameId));
-      toast(st === "won" ? `💰 Cashed: ${what} ${fmtMoney(p, { sign: true })}` : st === "lost" ? `Lost: ${what} (${fmtMoney(p)})` : `Push: ${what} — stake back`, st, st === "won");
+      if (b.ghost) toast(st === "won" ? `👻 Your pass hit: ${what}. Would've won ${fmtMoney(p, { sign: true })}` : st === "lost" ? `👻 Good pass: ${what} lost. Dodged ${fmtMoney(b.stake)}` : `👻 Pass pushed: ${what}`, st);
+      else toast(st === "won" ? `💰 Cashed: ${what} ${fmtMoney(p, { sign: true })}` : st === "lost" ? `Lost: ${what} (${fmtMoney(p)})` : `Push: ${what}. Stake back`, st, st === "won");
     }
   }
   detectMoves();
@@ -219,6 +220,8 @@ export function seedDemo() {
       id: uid(), createdAt: when.toISOString(), settledAt: new Date(when.getTime() + 4 * 3600e3).toISOString(),
       type: parlay ? "parlay" : "straight", stake: parlay ? [5, 10, 10, 20][Math.floor(r() * 4)] : [10, 20, 25, 50][Math.floor(r() * 4)],
       book: books[Math.floor(r() * books.length)], legs,
+      // Every 5th sample bet is a pass you tracked but didn't place.
+      ...(i % 5 === 2 ? { ghost: true } : {}),
     });
   }
   // Open bets on today's games so the live tracker has something to sweat.
@@ -242,6 +245,7 @@ export function seedDemo() {
     });
   }
   if (pre2) bets.push({ id: uid(), createdAt: new Date().toISOString(), type: "straight", stake: 20, book: "BetMGM", legs: [linked(pre2, "total", "under", totalOf(pre2), -108)] });
+  if (live3) bets.push({ id: uid(), createdAt: new Date(Date.now() - 2400e3).toISOString(), type: "straight", stake: 25, ghost: true, legs: [linked(live3, "spread", "home", spreadOf(live3, "home"), -110)] });
   bets.push({ id: uid(), createdAt: new Date().toISOString(), type: "parlay", stake: 5, book: "FanDuel", boostPct: 25, legs: [
     { id: uid(), pick: "Heisman: Arch Manning", odds: americanToDecimal(900), status: "open" },
     { id: uid(), pick: "Texas to make CFP", odds: americanToDecimal(-250), status: "open" },

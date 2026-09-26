@@ -5,6 +5,7 @@ import { betStatus, betProfit, ticketDecimal, potentialPayout, legLive, legLabel
 import * as cloud from "../cloud.js";
 import { esc, fmtTime, relDay, logo, statusText, curveSvg, icons } from "../ui.js";
 import { CLOUD } from "../account.js";
+import { realBets, ghostBets, ghostReport, parlayAutopsy, marketName } from "../autopsy.js";
 
 import { chip, pill } from "../render.js";
 import { dropZone } from "../sheets/import.js";
@@ -18,10 +19,15 @@ export function periodSince() {
 }
 
 export function viewBets() {
-  const sum = summarize(S.bets, { since: periodSince() });
-  const open = S.bets.filter((b) => betStatus(b) === "open");
-  const settled = S.bets.filter((b) => betStatus(b) !== "open").sort((a, b) => new Date(b.settledAt || b.createdAt) - new Date(a.settledAt || a.createdAt));
-  const sweating = open.filter((b) => b.legs.some((l) => l.status === "open" && game(l.gameId)?.state === "in"));
+  // Ghost bets are tracked and graded like any other, but never count toward your P/L.
+  const real = realBets(S.bets);
+  const ghosts = ghostBets(S.bets);
+  const sum = summarize(real, { since: periodSince() });
+  const byRecent = (a, b) => new Date(b.settledAt || b.createdAt) - new Date(a.settledAt || a.createdAt);
+  const open = real.filter((b) => betStatus(b) === "open");
+  const settled = real.filter((b) => betStatus(b) !== "open").sort(byRecent);
+  const live = (b) => betStatus(b) === "open" && b.legs.some((l) => l.status === "open" && game(l.gameId)?.state === "in");
+  const sweating = [...open.filter(live), ...ghosts.filter(live)];
 
   if (!S.bets.length) {
     return `<section class="empty-hero">
@@ -66,6 +72,7 @@ export function viewBets() {
   const tabs = `<div class="tabs">
     ${chip(`Open <em>${open.length}</em>`, "bets-tab", "open", S.f.betsTab === "open")}
     ${chip(`Settled <em>${settled.length}</em>`, "bets-tab", "settled", S.f.betsTab === "settled")}
+    ${chip(`Ghosts${ghosts.length ? ` <em>${ghosts.length}</em>` : ""}`, "bets-tab", "ghosts", S.f.betsTab === "ghosts")}
     ${chip("Insights", "bets-tab", "insights", S.f.betsTab === "insights")}
     <span class="grow"></span>
     <button class="btn sm primary tabs-add" data-act="open-add">${icons.plus} Add pick</button>
@@ -73,6 +80,7 @@ export function viewBets() {
 
   let list;
   if (S.f.betsTab === "insights") list = insightsHtml();
+  else if (S.f.betsTab === "ghosts") list = ghostsHtml(ghosts);
   else {
     const arr = S.f.betsTab === "open" ? open : settled;
     list = arr.length
@@ -98,7 +106,7 @@ export function groupByDay(arr, dateFn) {
 
 export function sweatCard(b) {
   const legs = b.legs.filter((l) => l.gameId && game(l.gameId)?.state === "in");
-  return `<button class="sweat-card" data-act="open-bet" data-id="${b.id}">
+  return `<button class="sweat-card ${b.ghost ? "ghost" : ""}" data-act="open-bet" data-id="${b.id}">
     ${legs.map((l) => {
       const g = game(l.gameId);
       const lv = legLive(l, g);
@@ -108,7 +116,7 @@ export function sweatCard(b) {
         <div class="sw-text">${esc(lv.text)}</div>
       </div>`;
     }).join("")}
-    <div class="sw-foot">${b.legs.length > 1 ? `${b.legs.length}-leg parlay · ` : ""}${fmtMoney(b.stake)} → ${fmtMoney(potentialPayout(b))}</div>
+    <div class="sw-foot">${b.ghost ? `<span class="ghost-tag">${GHOST}Ghost</span> ` : ""}${b.legs.length > 1 ? `${b.legs.length}-leg parlay · ` : ""}${fmtMoney(b.stake)} → ${fmtMoney(potentialPayout(b))}</div>
   </button>`;
 }
 
@@ -134,8 +142,9 @@ export function betCard(b) {
       ${isParlay ? `<span class="lodds">${odds(l.odds)}</span>` : ""}
     </div>`;
   }).join("");
-  return `<article class="bet ${st}" data-act="open-bet" data-id="${b.id}" tabindex="0">
+  return `<article class="bet ${st} ${b.ghost ? "ghost" : ""}" data-act="open-bet" data-id="${b.id}" tabindex="0">
     <header>
+      ${b.ghost ? `<span class="ghost-tag" title="Tracked, not placed. Doesn't count toward your P/L.">${GHOST}Ghost</span>` : ""}
       <span class="btype ${isParlay ? "parlay" : ""}">${isParlay ? `${b.legs.length}-leg parlay` : "Straight"}</span>
       ${b.book ? `<span class="book">${esc(b.book)}</span>` : ""}
       ${b.boostPct ? `<span class="boost">+${b.boostPct}% boost</span>` : ""}
@@ -145,10 +154,10 @@ export function betCard(b) {
     <div class="legs">${legsHtml}</div>
     ${isParlay && st === "open" ? `<div class="prog"><i style="width:${(won / b.legs.length) * 100}%"></i></div>` : ""}
     <footer>
-      <span>Risk <b>${fmtMoney(b.stake)}</b></span>
+      ${b.ghost ? ghostFooter(b, st, profit, isParlay, won) : `<span>Risk <b>${fmtMoney(b.stake)}</b></span>
       ${st === "open"
         ? `<span>To win <b>${fmtMoney(potentialPayout(b) - b.stake)}</b></span>${isParlay ? `<span class="muted">${won}/${b.legs.length} hit</span>` : ""}`
-        : `<span class="${profit > 0 ? "pos" : profit < 0 ? "neg" : ""}"><b>${fmtMoney(profit, { sign: true })}</b></span>`}
+        : `<span class="${profit > 0 ? "pos" : profit < 0 ? "neg" : ""}"><b>${fmtMoney(profit, { sign: true })}</b></span>`}`}
       <span class="grow"></span>${pill(st)}
     </footer>
   </article>`;
@@ -158,8 +167,8 @@ export function insightsHtml() {
   const table = (title, rows) => rows.length
     ? `<div class="card ins"><h3>${title}</h3><table><thead><tr><th></th><th>Bets</th><th>Record</th><th>Profit</th><th>ROI</th></tr></thead><tbody>${rows.map((r) => `<tr><td>${esc(r.key)}</td><td>${r.count}</td><td>${r.w}-${r.l}${r.p ? `-${r.p}` : ""}</td><td class="${r.profit > 0 ? "pos" : r.profit < 0 ? "neg" : ""}">${fmtMoney(r.profit, { sign: true, cents: false })}</td><td>${fmtPct(r.roi)}</td></tr>`).join("")}</tbody></table></div>`
     : "";
-  const bets = S.bets.filter((b) => !periodSince() || new Date(b.settledAt || b.createdAt) >= periodSince());
-  const marketOf = (b) => (b.legs.length > 1 ? "Parlay" : { ml: "Moneyline", spread: "Spread", total: "Total" }[b.legs[0].market] || guessMarket(b.legs[0].pick));
+  const bets = realBets(S.bets).filter((b) => !periodSince() || new Date(b.settledAt || b.createdAt) >= periodSince());
+  const marketOf = (b) => (b.legs.length > 1 ? "Parlay" : marketName(b.legs[0]));
   const oddsBucket = (b) => {
     const d = ticketDecimal(b);
     return d < 1.67 ? "-150 or shorter" : d < 2.1 ? "-150 to +110" : d < 4 ? "+110 to +300" : "+300 and up";
@@ -174,6 +183,7 @@ export function insightsHtml() {
       <div><span>Actual win rate</span><b class="${s.winRate > be ? "pos" : "neg"}">${fmtPct(s.winRate)}</b></div>
       <div><span>Best hit</span><b class="pos">${s.best && s.best.profit > 0 ? fmtMoney(s.best.profit, { sign: true }) : "—"}</b></div>
     </div>
+    ${autopsyHtml(bets)}
     ${table("By bet type", breakdown(bets, (b) => (b.legs.length > 1 ? "Parlay" : "Straight")))}
     ${table("By market", breakdown(bets, marketOf))}
     ${table("By odds range", breakdown(bets, oddsBucket).sort((a, b) => ["-150 or shorter", "-150 to +110", "+110 to +300", "+300 and up"].indexOf(a.key) - ["-150 or shorter", "-150 to +110", "+110 to +300", "+300 and up"].indexOf(b.key)))}
@@ -181,9 +191,69 @@ export function insightsHtml() {
   </div>`;
 }
 
-export function guessMarket(pick = "") {
-  if (/\bml\b|moneyline/i.test(pick)) return "Moneyline";
-  if (/\b(over|under|o\/u)\b/i.test(pick)) return "Total";
-  if (/[+-]\d+(\.5)?\b/.test(pick)) return "Spread";
-  return "Props & futures";
+
+const GHOST = `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 20V10a7 7 0 0 1 14 0v10l-2.5-2-2.5 2-2-2-2 2-2.5-2z"/><circle cx="9.5" cy="10.5" r="1" fill="currentColor"/><circle cx="14.5" cy="10.5" r="1" fill="currentColor"/></svg>`;
+
+function ghostFooter(b, st, profit, isParlay, won) {
+  if (st === "open") {
+    return `<span>Would risk <b>${fmtMoney(b.stake)}</b></span><span>to win <b>${fmtMoney(potentialPayout(b) - b.stake)}</b></span>${isParlay ? `<span class="muted">${won}/${b.legs.length} hit</span>` : ""}`;
+  }
+  if (st === "won") return `<span class="pos">Would've won <b>${fmtMoney(profit, { sign: true })}</b></span>`;
+  if (st === "lost") return `<span class="dodged">Dodged <b>${fmtMoney(b.stake)}</b></span>`;
+  return `<span class="muted">No result</span>`;
+}
+
+/** The Ghosts tab: how your passes did, next to your real bets. */
+function ghostsHtml(ghosts) {
+  const since = periodSince();
+  const r = ghostReport(S.bets, { since });
+  const g = r.ghosts, real = r.real;
+  const period = S.f.period === "all" ? "all time" : `last ${S.f.period.replace("d", " days")}`;
+  const cls = (v) => (v > 0 ? "pos" : v < 0 ? "neg" : "");
+  const intro = `<div class="card ghost-sum">
+    <div class="gs-head"><span class="gs-ico">${GHOST}</span><div><h3>Your passes</h3><p class="muted small">Picks you tracked but didn't bet · ${esc(period)}</p></div></div>
+    ${g.count
+      ? `<div class="gs-grid">
+          <div><span>Record</span><b>${g.w}-${g.l}${g.p ? `-${g.p}` : ""}</b></div>
+          <div><span>Would be</span><b class="${cls(g.profit)}">${fmtMoney(g.profit, { sign: true })}</b></div>
+          <div><span>ROI</span><b class="${cls(g.roi)}">${fmtPct(g.roi)}</b></div>
+          <div><span>Dodged</span><b>${fmtMoney(r.dodged)}</b></div>
+        </div>
+        <div class="gs-vs"><span class="muted">Your real bets, same stretch</span><b>${real.w}-${real.l}${real.p ? `-${real.p}` : ""} · <span class="${cls(real.profit)}">${fmtMoney(real.profit, { sign: true })}</span> · ROI ${fmtPct(real.roi)}</b></div>
+        ${r.verdict ? `<p class="gs-verdict ${r.verdict.tone}">${esc(r.verdict.text)}</p>` : `<p class="muted small">Settle at least 3 passes and 3 real bets to see how they compare.</p>`}`
+      : `<p class="muted">Turn on <b>Ghost bet</b> when adding a pick or tracking a slip, and hedgehog follows it like any other bet without counting it toward your P/L. It's a way to find out whether the bets you talk yourself out of would have won.</p>`}
+  </div>`;
+  const open = ghosts.filter((b) => betStatus(b) === "open");
+  const done = ghosts.filter((b) => betStatus(b) !== "open").sort((a, b) => new Date(b.settledAt || b.createdAt) - new Date(a.settledAt || a.createdAt));
+  const section = (title, arr) => (arr.length ? `<div class="day-h">${title}</div>${arr.map(betCard).join("")}` : "");
+  return `${intro}<div class="bet-list">${section("Still in play", open)}${section("Settled", done)}</div>
+    <button class="btn block ghost-add" data-act="open-add" data-ghost="1">${GHOST} Track a pass</button>`;
+}
+
+/** Insights card: what's been killing your parlays. */
+function autopsyHtml(bets) {
+  const a = parlayAutopsy(bets);
+  if (!a.count) return `<div class="card ins autopsy"><h3>Parlay autopsy</h3><p class="muted small">Settle a few parlays and this breaks down which legs sink them.</p></div>`;
+  const cls = (v) => (v > 0 ? "pos" : v < 0 ? "neg" : "");
+  const lines = [];
+  if (a.lost) {
+    lines.push(a.oneAway
+      ? `<b>${a.oneAway} of ${a.lost}</b> losing parlays missed by a single leg, about <b>${fmtMoney(a.oneAwayPayout, { cents: false })}</b> in payouts you just missed.`
+      : `None of your ${a.lost} losing parlays were one leg away; they missed by two or more.`);
+    if (a.lastLegBusts) lines.push(`<b>${a.lastLegBusts}</b> died on the very last leg to play, after everything else hit.`);
+  }
+  if (a.killer && a.killer.missRate > 0) lines.push(`Your leakiest leg type is <b>${esc(a.killer.market.toLowerCase())}</b>: they miss <b>${fmtPct(a.killer.missRate, 0)}</b> of the time inside parlays.`);
+  const diff = a.straightsProfit - a.parlayProfit;
+  lines.push(`The same money as straight bets would be <b class="${cls(a.straightsProfit)}">${fmtMoney(a.straightsProfit, { sign: true, cents: false })}</b> vs <b class="${cls(a.parlayProfit)}">${fmtMoney(a.parlayProfit, { sign: true, cents: false })}</b> as parlays (${diff > 0 ? `straights ahead by ${fmtMoney(diff, { cents: false })}` : diff < 0 ? `parlays ahead by ${fmtMoney(-diff, { cents: false })}` : "dead even"}).`);
+  const maxLegs = Math.max(...a.markets.map((m) => m.legs), 1);
+  const bars = a.markets.map((m) => `<div class="ab-row"><span>${esc(m.market)}</span><div class="ab-bar"><i class="hit" style="width:${((m.legs - m.lost) / maxLegs) * 100}%"></i><i class="miss" style="width:${(m.lost / maxLegs) * 100}%"></i></div><b>${fmtPct(m.missRate, 0)}</b></div>`).join("");
+  const sizes = a.sizes.map((s) => `<tr><td>${esc(s.size)} legs</td><td>${s.won}/${s.count}</td><td class="${s.hitRate >= s.impliedRate ? "pos" : "neg"}">${fmtPct(s.hitRate, 0)}</td><td class="muted">${fmtPct(s.impliedRate, 0)}</td></tr>`).join("");
+  return `<div class="card ins autopsy">
+    <h3>Parlay autopsy <small class="muted">${a.count} settled · ${a.won}-${a.lost}</small></h3>
+    <ul class="ap-lines">${lines.map((l) => `<li>${l}</li>`).join("")}</ul>
+    <h4>Miss rate by leg type</h4>
+    <div class="ab">${bars}</div>
+    <h4>Hit rate by size</h4>
+    <table><thead><tr><th></th><th>Hit</th><th>Rate</th><th>Odds said</th></tr></thead><tbody>${sizes}</tbody></table>
+  </div>`;
 }

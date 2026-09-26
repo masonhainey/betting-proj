@@ -118,7 +118,8 @@ export function slipHtml() {
     ${parlayBox}
     <div id="slip-summary">${slipSummary(c)}</div>
     <label class="bookf"><span>Book</span><input id="slip-book" data-in="slip-book" list="books" placeholder="Where you're placing it" value="${esc(S.slip.book || "")}"></label>
-    <button class="btn primary block" data-act="slip-track">Track ${mode === "parlay" ? "parlay" : n > 1 ? "bets" : "bet"}</button>
+    <label class="switch ghost-sw ${S.slip.ghost ? "on" : ""}"><input type="checkbox" data-act="slip-ghost" ${S.slip.ghost ? "checked" : ""}><span class="knob"></span><span class="gs-label"><b>Ghost bet</b><small>Track it without placing it. It won't count toward your P/L.</small></span></label>
+    <button class="btn primary block" data-act="slip-track">Track ${S.slip.ghost ? "ghost " : ""}${mode === "parlay" ? "parlay" : n > 1 ? "bets" : "bet"}</button>
   </div>`;
 }
 

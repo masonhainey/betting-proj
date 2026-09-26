@@ -34,6 +34,19 @@ To try it without real bets, open **Settings → Demo mode**. It loads a simulat
 
 Open bets have manual grading per leg, cash-out, a hedge calculator and notes.
 
+**Ghost bets.** Flip on **Ghost bet** when adding a pick or tracking a slip (or use "Make it a ghost" on any bet) to follow a pick you're *not* placing.
+- Ghosts track live and auto-grade like real bets, but never count toward your profit, record or Insights.
+- The **Ghosts** tab shows your passes' record, what they'd be up or down, how much you dodged, and whether your passes are beating your real bets.
+
+**Parlay autopsy** (Insights) breaks down your settled parlays:
+- how many losses missed by a single leg, and the payout you missed
+- how many died on the last leg to play
+- which kind of leg misses most
+- what the same money would have made as straight bets
+- hit rate by parlay size against what the odds implied
+
+A lost parlay's detail view also names the leg or legs that sank it.
+
 **Import a slip.** Drop a screenshot onto the page, paste one, or pick one from your photos. You can also paste the share text or link your book gives you.
 - Screenshots are read in the browser with [Tesseract.js](https://github.com/naptha/tesseract.js). It's downloaded from jsDelivr the first time (~12 MB), and the image never leaves your device.
 - hedgehog pulls out the book, legs, odds, stake and payout, and matches each pick to a real game so it tracks live and auto-grades. You review everything before it's saved.
@@ -81,6 +94,7 @@ js/sheets/*.js     game, bet, add-a-pick, import, settings sheets
 js/espn.js         ESPN fetch + normalization (handles both odds formats ESPN has shipped)
 js/odds.js         American/decimal/fractional parsing, stepping, parlay, hedge, no-vig
 js/grade.js        bet model, live leg status, auto-grading, stats
+js/autopsy.js      ghost bets report + parlay autopsy
 js/slipparse.js    bet-slip text → draft bet; matches picks to games
 js/ocr.js          lazy-loaded Tesseract.js OCR with dark-mode image cleanup
 js/cloud.js        Supabase sign-in (email + password) + records table over fetch

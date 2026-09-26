@@ -1,5 +1,6 @@
 // Bet detail sheet: grading, cash out, ticket payout, hedge, notes.
 
+import { bustedLegs, asStraights } from "../autopsy.js";
 import { parseOdds, hedge, fmtMoney } from "../odds.js";
 import { betStatus, betProfit, ticketDecimal, potentialPayout, legLive, legLabel, computedDecimal } from "../grade.js";
 import { esc, fmtDayTime, logo, statusText, icons } from "../ui.js";
@@ -27,8 +28,10 @@ export function sheetBet() {
   }).join("");
   return `<div class="sheet-h"><h2>${isParlay ? `${b.legs.length}-leg parlay` : "Straight bet"}</h2>${closeBtn()}</div>
     <div class="dhead">
-      ${pill(st)}<span class="muted">${esc(b.book || "No book")} · placed ${esc(fmtDayTime(b.createdAt))}</span>
+      ${pill(st)}<span class="muted">${esc(b.book || "No book")} · ${b.ghost ? "tracked" : "placed"} ${esc(fmtDayTime(b.createdAt))}</span>
     </div>
+    ${b.ghost ? `<div class="notice ghost-note"><span><b>👻 Ghost bet.</b> Tracked like a real bet but kept out of your P/L.</span><button class="btn sm" data-act="toggle-ghost" data-id="${b.id}">I placed it</button></div>` : ""}
+    ${autopsyLine(b, st)}
     <div class="dsum">
       <div><span>Odds</span><b>${odds(ticketDecimal(b))}</b>${b.ticketPayout ? `<small>from ticket</small>` : b.oddsOverride ? `<small>book price</small>` : ""}${b.boostPct ? `<small>+${b.boostPct}% boost</small>` : ""}</div>
       <div><span>Risk</span><b>${fmtMoney(b.stake)}</b></div>
@@ -52,6 +55,7 @@ export function sheetBet() {
     <div class="dactions">
       ${b.link ? `<a class="btn sm" href="${esc(b.link)}" target="_blank" rel="noopener">${icons.ext} Open on ${esc(b.book || "your book")}</a>` : ""}
       ${b.legs.some((l) => l.gameId) ? `<button class="btn sm" data-act="rebuild" data-id="${b.id}">Rebuild in slip</button>` : ""}
+      ${b.ghost ? "" : `<button class="btn sm" data-act="toggle-ghost" data-id="${b.id}" title="Keep tracking it, but leave it out of your P/L">Make it a ghost</button>`}
       <span class="grow"></span>
       <button class="btn sm danger" data-act="delete-bet" data-id="${b.id}">${S.confirmDelete === b.id ? "Tap again to delete" : "Delete"}</button>
     </div>`;
@@ -60,4 +64,14 @@ export function sheetBet() {
 export function hedgeText(h) {
   if (!h) return `<span class="muted">Enter the opposing price</span>`;
   return `Bet <b>${fmtMoney(h.stake)}</b> → lock <b class="${h.locked >= 0 ? "pos" : "neg"}">${fmtMoney(h.locked, { sign: true })}</b> either way`;
+}
+
+/** For a lost parlay: which leg(s) sank it, and what straights would have made instead. */
+function autopsyLine(b, st) {
+  if (b.legs.length < 2 || st !== "lost" || b.cashout != null) return "";
+  const busted = bustedLegs(b);
+  const hit = b.legs.filter((l) => l.status === "won").length;
+  const straights = asStraights(b);
+  const names = busted.map((l) => `<b>${esc(legLabel(l, game(l.gameId)))}</b>`).join(" and ");
+  return `<div class="notice autopsy-note"><span>${busted.length === 1 ? `Sunk by ${names} after ${hit} of ${b.legs.length - 1} other legs hit.` : `Sunk by ${names}.`} As straight bets, the same ${fmtMoney(b.stake)} would be <b class="${straights > 0 ? "pos" : straights < 0 ? "neg" : ""}">${fmtMoney(straights, { sign: true })}</b>.</span></div>`;
 }

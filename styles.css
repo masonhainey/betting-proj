@@ -821,3 +821,52 @@ code { font-size: 12.5px; background: var(--card3); padding: 1px 5px; border-rad
   .ins { padding: 12px; }
   .ins table { font-size: 12.5px; }
 }
+
+/* ───────── ghost bets ───────── */
+.bet.ghost { border-style: dashed; border-color: var(--line2); background: color-mix(in srgb, var(--card) 70%, transparent); }
+.bet.ghost::before { opacity: 0.45; }
+.bet.ghost .legs, .bet.ghost .bodds { opacity: 0.85; }
+.sweat-card.ghost { border-style: dashed; background: var(--card); }
+.ghost-tag { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; color: var(--purple); }
+.ghost-tag svg { width: 14px; height: 14px; }
+.dodged { color: var(--muted); }
+.dodged b { color: var(--text); }
+.ghost-sw { display: flex; align-items: flex-start; gap: 12px; margin-top: 16px; padding: 12px; border-radius: 12px; border: 1px dashed var(--line2); }
+.ghost-sw.on { border-color: var(--purple); background: var(--purple-soft); }
+.ghost-sw .knob { margin-top: 2px; }
+.gs-label { display: flex; flex-direction: column; gap: 1px; font-weight: 500; }
+.gs-label b { font-size: 14px; }
+.gs-label small { color: var(--muted); font-size: 12.5px; }
+.ghost-sum { padding: 16px; margin: 10px 0 4px; border-style: dashed; }
+.gs-head { display: flex; gap: 12px; align-items: center; }
+.gs-ico { display: grid; place-items: center; width: 42px; height: 42px; border-radius: 12px; background: var(--purple-soft); color: var(--purple); flex: none; }
+.gs-ico svg { width: 24px; height: 24px; }
+.gs-head h3 { font-size: 18px; }
+.gs-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 14px; }
+.gs-grid div, .gs-vs { display: flex; flex-direction: column; gap: 2px; }
+.gs-grid span { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.gs-grid b { font-size: 18px; }
+.gs-vs { margin-top: 12px; padding-top: 12px; border-top: 1px solid var(--line); font-size: 13px; }
+.gs-vs b { font-size: 14px; }
+.gs-verdict { margin-top: 12px; padding: 10px 12px; border-radius: 10px; font-size: 13.5px; font-weight: 600; background: var(--card2); }
+.gs-verdict.warn { background: var(--amber-soft); color: var(--amber); }
+.gs-verdict.good { background: var(--win-soft); color: var(--win); }
+.ghost-add { margin-top: 14px; border-style: dashed; color: var(--purple); }
+.ghost-add svg { width: 18px; height: 18px; }
+.ghost-note { align-items: center; background: var(--purple-soft); border-color: transparent; }
+.ghost-note span { flex: 1; }
+@media (max-width: 480px) { .gs-grid { grid-template-columns: repeat(2, 1fr); } }
+
+/* ───────── parlay autopsy ───────── */
+.autopsy { grid-column: 1 / -1; }
+.autopsy h3 small { font-weight: 500; font-size: 12px; margin-left: 6px; }
+.autopsy h4 { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 16px 0 8px; }
+.ap-lines { margin: 4px 0 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; line-height: 1.45; }
+.ap-lines li::marker { color: var(--purple); }
+.ab { display: flex; flex-direction: column; gap: 7px; }
+.ab-row { display: grid; grid-template-columns: 118px 1fr 44px; align-items: center; gap: 10px; font-size: 13px; }
+.ab-row b { text-align: right; }
+.ab-bar { display: flex; height: 10px; border-radius: 99px; overflow: hidden; background: var(--card3); }
+.ab-bar .hit { background: var(--win); opacity: 0.75; }
+.ab-bar .miss { background: var(--red); }
+.autopsy-note { background: var(--red-soft); border-color: transparent; }

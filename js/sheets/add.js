@@ -106,7 +106,13 @@ export function sheetAdd() {
       <label class="field"><span>Book</span><input id="f-book" data-in="f-book" list="books" placeholder="DraftKings, FanDuel…" value="${esc(f.book)}"></label>
     </div>
     <label class="field"><span>Note</span><input id="f-note" data-in="f-note" placeholder="Optional" value="${esc(f.note)}"></label>
-    <button class="btn primary block" data-act="form-save">Track ${f.type === "parlay" ? `${legs.length}-leg parlay` : "bet"}</button>`;
+    <label class="switch ghost-sw ${f.ghost ? "on" : ""}"><input type="checkbox" data-act="form-ghost" ${f.ghost ? "checked" : ""}><span class="knob"></span><span class="gs-label"><b>Ghost bet</b><small>Track it without placing it. It won't count toward your P/L.</small></span></label>
+    <button class="btn primary block" data-act="form-save">${saveLabel(f, legs.length)}</button>`;
+}
+
+function saveLabel(f, n) {
+  const what = f.type === "parlay" ? `${n}-leg parlay` : "bet";
+  return f.ghost ? `Track ghost ${what}` : `Track ${what}`;
 }
 
 export function formCalcHtml(c) {
@@ -166,6 +172,7 @@ export function saveForm() {
     note: f.note.trim(),
     legs: legs.map((l) => ({ id: uid(), pick: l.pick.trim(), odds: l.odds, status: "open", gameId: l.gameId, market: l.market, side: l.side, line: l.line, gameLabel: l.gameLabel, kickoff: l.kickoff })),
   };
+  if (f.ghost) bet.ghost = true;
   if (num(f.ticket) > 0 && f.lastEdited !== "win") bet.ticketPayout = Math.round(num(f.ticket) * 100) / 100;
   if (f.link) bet.link = f.link;
   if (f.type === "parlay") {
@@ -178,8 +185,8 @@ export function saveForm() {
   saveBets();
   S.sheet = null;
   S.form = null;
-  S.f.betsTab = "open";
-  toast(`Tracking ${f.type === "parlay" ? `${legs.length}-leg parlay` : bet.legs[0].pick}`, "won");
+  S.f.betsTab = f.ghost ? "ghosts" : "open";
+  toast(`${f.ghost ? "👻 Tracking your pass: " : "Tracking "}${f.type === "parlay" ? `${legs.length}-leg parlay` : bet.legs[0].pick}`, "won");
   if (S.tab !== "bets") location.hash = "bets";
   render();
 }
@@ -201,5 +208,5 @@ export function paintForm() {
   const tk = $("#f-ticket");
   if (tk) tk.placeholder = c.calcPayout ? c.calcPayout.toFixed(2) : "from your book";
   const btn = $('[data-act="form-save"]');
-  if (btn) btn.textContent = `Track ${f.type === "parlay" ? `${c.legs.length}-leg parlay` : "bet"}`;
+  if (btn) btn.textContent = saveLabel(f, c.legs.length);
 }

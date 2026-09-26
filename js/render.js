@@ -105,7 +105,7 @@ export const pill = (st) => {
 };
 
 export function myActionCount(gid) {
-  return S.bets.filter((b) => betStatus(b) === "open" && b.legs.some((l) => l.gameId === gid && l.status === "open")).length;
+  return S.bets.filter((b) => !b.ghost && betStatus(b) === "open" && b.legs.some((l) => l.gameId === gid && l.status === "open")).length;
 }
 
 export function scoreRows(g, { big = false } = {}) {
