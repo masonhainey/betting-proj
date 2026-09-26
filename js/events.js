@@ -1,5 +1,7 @@
 // User input: click/input/change/keyboard handlers, drag & drop, paste, routing.
 
+import { enableAlerts, disableAlerts, notify, setPref, unsubscribePush } from "./alerts.js";
+import { alertsHtml } from "./sheets/settings.js";
 import { friendsActions, handleJoinLink, onFriendsTab } from "./views/friends.js";
 import { shareActions, shareInputs, handleTailLink } from "./sheets/share.js";
 import { ymd } from "./espn.js";
@@ -410,8 +412,29 @@ export const actions = {
       return;
     }
     S.confirmDelete = null;
+    await unsubscribePush(); // this device shouldn't keep getting the account's alerts
     await cloud.signOut();
     toast("Signed out. Your bets stay on this device.");
+  },
+  "alerts-on": async (el) => {
+    el.disabled = true;
+    el.textContent = "Asking…";
+    const r = await enableAlerts();
+    if (!r.ok) toast({ "ios-install": "Add hedgehog to your Home Screen first, then turn alerts on from there", denied: "Notifications are blocked. Allow them in Settings to get alerts", dismissed: "No problem. Turn alerts on any time", unsupported: "This browser can't show notifications" }[r.why] || "Couldn't turn alerts on", r.why === "dismissed" ? "" : "err");
+    paintAlerts();
+  },
+  "alerts-off": async () => {
+    await disableAlerts();
+    toast("Alerts are off on this device");
+    paintAlerts();
+  },
+  "alerts-test": async () => {
+    const ok = await notify({ title: "💰 Cashed: Texas -7.5 (test)", body: "+$18.18 · pays $38.18. This is what a result alert looks like.", tag: "test", url: "#bets" });
+    if (!ok) toast("Couldn't show a notification. Check that they're allowed", "err");
+  },
+  "alerts-pref": async (el) => {
+    el.closest(".atype")?.classList.toggle("on", el.checked);
+    await setPref(el.dataset.v, el.checked);
   },
   "dismiss-sync": () => {
     settings.syncBannerDismissed = true;
@@ -614,7 +637,12 @@ document.addEventListener("keydown", (e) => {
   }
 });
 
-export async function importFile(file) {
+export function paintAlerts() {
+  const el = document.getElementById("alerts-box");
+  if (el) el.innerHTML = alertsHtml();
+}
+
+async function importFile(file) {
   if (!file) return;
   try {
     const data = JSON.parse(await file.text());

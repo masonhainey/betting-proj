@@ -62,6 +62,13 @@ A lost parlay's detail view also names the leg or legs that sank it.
 - Each member's app publishes its own summary, so it's an honor system among friends.
 - Demo mode shows a pretend group.
 
+**Alerts** (Settings → Alerts). Notifications for parlay legs hitting, bets cashing, losing or pushing, kickoffs of your games, and your team reaching the red zone. Each type can be turned off, including ghost-bet alerts.
+- **While hedgehog is open or in the background:** works out of the box once you allow notifications. On iPhone, hedgehog must be added to the Home Screen first.
+- **With hedgehog closed:** a GitHub Actions job ([`scripts/alerts-worker.mjs`](scripts/alerts-worker.mjs), every ~5 min) checks signed-in users' open bets against ESPN final scores and sends Web Push.
+  - Results usually arrive 5–15 minutes after the final. Red-zone alerts are in-app only because they'd arrive too late.
+  - Each alert is sent once, and devices that stop accepting alerts are removed.
+  - Setup: run [`supabase/alerts.sql`](supabase/alerts.sql), then add the repository secret `SUPABASE_SECRET_KEY` (the Supabase secret / service_role key). The push signing keys are created on the first run and stored in Supabase.
+
 **Import a slip.** Drop a screenshot onto the page, paste one, or pick one from your photos. You can also paste the share text or link your book gives you.
 - Screenshots are read in the browser with [Tesseract.js](https://github.com/naptha/tesseract.js). It's downloaded from jsDelivr the first time (~12 MB), and the image never leaves your device.
 - hedgehog pulls out the book, legs, odds, stake and payout, and matches each pick to a real game so it tracks live and auto-grades. You review everything before it's saved.
@@ -113,6 +120,9 @@ js/autopsy.js      ghost bets report + parlay autopsy
 js/share.js        share-link encode/decode (validated) + share text
 js/leaderboard.js  stats each member publishes + ranking
 js/friends.js      groups, members, publishing (Supabase)
+js/alerts.js       notification permission, local alerts, push subscription
+js/alertrules.js   what triggers an alert and its wording (shared with the worker)
+scripts/           alerts-worker.mjs (scheduled push sender)
 js/sharecard.js    share-card image (canvas)
 js/slipparse.js    bet-slip text → draft bet; matches picks to games
 js/ocr.js          lazy-loaded Tesseract.js OCR with dark-mode image cleanup
@@ -121,7 +131,7 @@ js/sync.js         local-first sync: change detection, tombstones, last-write-wi
 js/config.js       Supabase project URL + publishable key
 js/news.js         headline tagging
 js/demo.js         simulated data source with the same interface as espn.js
-supabase/          schema.sql (sync) and friends.sql (leaderboard) to paste into Supabase
+supabase/          schema.sql (sync), friends.sql (leaderboard), alerts.sql (push) to paste into Supabase
 tests/             node --test
 ```
 

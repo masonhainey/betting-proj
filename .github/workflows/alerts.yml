@@ -1,0 +1,28 @@
+name: Alerts
+
+# Checks open bets against final scores and sends push notifications to devices that
+# turned alerts on. Needs one repository secret: SUPABASE_SECRET_KEY
+# (Supabase → Project Settings → API Keys → secret key / service_role key).
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+concurrency:
+  group: alerts
+  cancel-in-progress: false
+
+jobs:
+  send:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: npm install --no-save --no-package-lock web-push@3.6.7
+      - run: node scripts/alerts-worker.mjs
+        env:
+          SUPABASE_URL: https://vcmgdhmhizyqjnyjxmcl.supabase.co
+          SUPABASE_SECRET_KEY: ${{ secrets.SUPABASE_SECRET_KEY }}

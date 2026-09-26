@@ -1,5 +1,6 @@
 // Entry point.
 
+import { alertsOn, subscribePush } from "./alerts.js";
 import { handleJoinLink, onFriendsTab } from "./views/friends.js";
 import { handleTailLink } from "./sheets/share.js";
 import * as cloud from "./cloud.js";
@@ -29,6 +30,7 @@ function boot() {
     handleAuthLink();
     if (cloud.currentUser()) syncNow();
   }
+  if (alertsOn() && cloud.currentUser()) subscribePush();
   tick(true);
   setInterval(tick, 5000);
   // Installed-app support (Add to Home Screen): offline shell + faster launches.

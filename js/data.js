@@ -1,5 +1,6 @@
 // Feed refreshing (ESPN or demo), caching, kickoff/line tracking, auto-grading, polling.
 
+import { alertsForGraded, watchGames, alertsOn } from "./alerts.js";
 import { ymd, addDays } from "./espn.js";
 import { americanToDecimal, fmtMoney } from "./odds.js";
 import { betStatus, betProfit, legLabel, autoGrade } from "./grade.js";
@@ -60,6 +61,8 @@ export function pruneTracking() {
 
 export function afterData() {
   const changed = autoGrade(S.bets, game);
+  alertsForGraded(changed);
+  watchGames();
   if (changed.length) {
     saveBets();
     for (const c of changed) {
@@ -165,9 +168,27 @@ export async function refreshNews() {
   render();
 }
 
+/** You have an open leg on a game that's live or about to start. */
+function liveAction(now) {
+  return S.bets.some((b) => b.legs.some((l) => {
+    if (l.status !== "open" || !l.gameId) return false;
+    const g = game(l.gameId);
+    return g && (g.state === "in" || (g.state === "pre" && new Date(g.date) - now < 15 * 60000));
+  }));
+}
+
 export function tick(force) {
-  if (document.hidden && !force) return;
   const now = Date.now();
+  if (document.hidden && !force) {
+    // In the background, keep an eye on your live games (gently) only if alerts are on.
+    if (!alertsOn() || !liveAction(now)) return;
+    const st = S.st.today;
+    if (!st.loading && (!st.tried || now - st.tried >= (settings.demo ? 8000 : 60000))) {
+      st.tried = now;
+      refreshToday();
+    }
+    return;
+  }
   const todays = S.todayIds.map(game).filter(Boolean);
   const hot = todays.some((g) => g.state === "in" || (g.state === "pre" && new Date(g.date) - now < 15 * 60000));
   const due = (name, every, fn) => {
