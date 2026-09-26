@@ -2230,6 +2230,10 @@ function boot() {
   render();
   tick(true);
   setInterval(tick, 5000);
+  // Installed-app support (Add to Home Screen): offline shell + faster launches.
+  if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {
+    navigator.serviceWorker.register("sw.js").catch(() => {});
+  }
 }
 
 boot();
