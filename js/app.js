@@ -9,7 +9,7 @@ import {
   betStatus, betProfit, betDecimal, ticketDecimal, potentialPayout, legLive, legLabel,
   autoGrade, summarize, breakdown, SETTLED, computedDecimal,
 } from "./grade.js";
-import { parseSlipText, linkPick } from "./slipparse.js";
+import { parseSlipText, linkPick, readScore } from "./slipparse.js";
 import { readImage } from "./ocr.js";
 import { load, save, uid, DEFAULT_SETTINGS } from "./store.js";
 import { TAGS, tagArticle, mentionsTeam } from "./news.js";
@@ -1202,7 +1202,7 @@ function sheetGame() {
   return `<div class="sheet-h"><h2>${esc(g.shortName)}</h2>${closeBtn()}</div>
     <div class="gsheet-top ${g.state}">
       <div class="gs-status">${g.state === "in" ? `<span class="dot live"></span>` : ""}${esc(g.state === "pre" ? (g.timeValid ? fmtDayTime(g.date) : `${fmtDay(g.date)} · TBD`) : g.detail || statusText(g))}</div>
-      <div class="teams big">${scoreRows(g, { big: true })}</div>
+      <div class="teams lg">${scoreRows(g, { big: true })}</div>
       <div class="gs-meta">${[g.tv, g.venue, g.city, g.notes].filter(Boolean).map(esc).join(" · ")}</div>
       <div class="stags">${rankedBadge(g)}${kickBadge(g)}</div>
       ${g.state === "in" && g.situation?.lastPlay ? `<div class="lp">${esc(g.situation.lastPlay)}</div>` : ""}
@@ -1309,7 +1309,7 @@ async function handleImage(file) {
       S.imp.stage = stage;
       S.imp.progress = p;
       paintImportProgress();
-    });
+    }, readScore);
     S.imp.text = text.replace(/\n{3,}/g, "\n\n").trim();
     S.imp.parsed = parseSlipText(S.imp.text);
   } catch (e) {
@@ -1341,9 +1341,9 @@ function importPreview() {
   const pool = linkPool();
   const linkOnly = p.url && !p.legs.length && p.stake == null;
   const rows = p.legs.map((l) => {
-    const m = linkPick(l.pick, pool);
+    const m = linkPick(l.pick, pool, l.context);
     const g = m && game(m.gameId);
-    return `<div class="ip-leg"><span class="ldot"></span><div class="lmain"><div class="lpick">${esc(l.pick)}</div>${g ? `<div class="lmeta">${logo(g.away, 16)}${logo(g.home, 16)} ${esc(g.shortName)} · ${esc(relDay(g.date))}${m.market !== "other" ? " · tracks live" : ""}</div>` : `<div class="lmeta">No game match: it'll be tracked manually</div>`}</div><span class="lodds">${odds(l.odds)}</span></div>`;
+    return `<div class="ip-leg"><span class="ldot"></span><div class="lmain"><div class="lpick">${esc(l.pick)}${l.uncertain ? `<span class="chk" title="The +/- sign didn't come through. Check this price.">check ±</span>` : l.solved ? `<span class="chk ok" title="The +/- sign was missing; recovered by matching your ticket's payout">sign fixed</span>` : ""}</div>${g ? `<div class="lmeta">${logo(g.away, 16)}${logo(g.home, 16)} ${esc(g.shortName)} · ${esc(relDay(g.date))}${m.market !== "other" ? " · tracks live" : ""}</div>` : `<div class="lmeta">No game match: it'll be tracked manually</div>`}</div><span class="lodds">${odds(l.odds)}</span></div>`;
   }).join("");
   return `<div class="ip-sum">
       ${p.book ? `<span class="pill open">${esc(p.book)}</span>` : ""}
@@ -1351,6 +1351,7 @@ function importPreview() {
       ${p.stake != null ? `<span>${fmtMoney(p.stake)} → <b>${p.payout != null ? fmtMoney(p.payout) : "?"}</b></span>` : ""}
     </div>
     ${rows ? `<div class="ip-legs">${rows}</div>` : ""}
+    ${p.oddsCheck != null && p.oddsCheck >= 0.03 && p.legs.length ? `<div class="notice warn">${icons.clock}<span>These legs multiply to ${fmtMoney((p.stake || 1) * p.legs.reduce((a, l) => a * l.odds, 1))}, not the ticket's ${p.payout != null ? fmtMoney(p.payout) : odds(p.totalOdds)}. A price may be misread or a leg missing (or it's a same-game parlay). The ticket's payout will be used either way.</span></div>` : ""}
     ${linkOnly ? `<div class="notice warn">${icons.link}<span>Sportsbook share links open inside the book's app and need your login, so hedgehog can't read them. Paste the share text that came with the link, or drop a screenshot. The link will still be saved on the bet.</span></div>` : ""}
     ${!p.legs.length && !linkOnly ? `<p class="muted small">Couldn't find picks with odds. Fix the text above (one pick per line, like <code>Georgia -7.5 -110</code>) or continue and fill the form in by hand.</p>` : ""}`;
 }
@@ -1361,7 +1362,7 @@ function sheetImport() {
     ${I.img ? `<div class="imp-img"><img src="${esc(I.img)}" alt="Your bet slip"></div>` : ""}
     ${I.busy
       ? `<div class="imp-prog"><div class="imp-track"><i id="imp-bar" style="width:${Math.round((I.progress || 0) * 100)}%"></i></div><span id="imp-stage" class="muted small">${esc(I.stage || "Working")}…</span>
-         <p class="muted small">The first import downloads a text reader (~12 MB, one time). Your screenshot is read in your browser and isn't uploaded anywhere.</p></div>`
+         <p class="muted small">The first import downloads a text reader (~12 MB, one time). Your screenshot is read in your browser and isn't uploaded anywhere. Tip: cropping to just the bet slip reads best.</p></div>`
       : `${I.error ? `<div class="notice err">${esc(I.error)}. You can still paste the text below.</div>` : ""}
          <label class="field"><span>${I.img ? "What we read" : "Share text or link"} <small>edit anything that looks off</small></span>
          <textarea id="imp-text" data-in="imp-text" rows="${I.img ? 7 : 6}" placeholder="Paste the text your book shares, e.g.\n4 Leg Parlay +867\nTexas -7.5 -110\n…\nWager $20.00  To Pay $193.40">${esc(I.text || "")}</textarea></label>
@@ -1374,8 +1375,8 @@ function openDraft() {
   const pool = linkPool();
   let linked = 0;
   const legs = p.legs.map((l) => {
-    const leg = newFormLeg({ pick: l.pick, odds: l.odds, oddsText: formatOdds(l.odds, fmt()) });
-    const m = linkPick(l.pick, pool);
+    const leg = newFormLeg({ pick: l.pick, odds: l.odds, oddsText: formatOdds(l.odds, fmt()), uncertain: !!l.uncertain });
+    const m = linkPick(l.pick, pool, l.context);
     if (m) {
       const g = game(m.gameId);
       Object.assign(leg, m, { gameLabel: g.shortName, kickoff: g.date });
@@ -1463,7 +1464,7 @@ function sheetAdd() {
     return `<div class="fleg">
       ${f.type === "parlay" ? `<div class="fl-h"><span>Leg ${i + 1}</span>${legs.length > 2 ? `<button class="link" data-act="form-rm-leg" data-id="${l.id}">Remove</button>` : ""}</div>` : ""}
       <label class="field"><span>Pick</span><input id="f-pick-${l.id}" data-in="f-pick" data-id="${l.id}" placeholder="${i ? "e.g. Over 48.5" : "e.g. Georgia -7.5, Texas ML, Over 52.5"}" value="${esc(l.pick)}" autocomplete="off"></label>
-      <div class="field"><span>Odds <small>type +150, -110, 2.5, x9.3 or 5/2</small></span>${stepper(`f-odds-${l.id}`, l.oddsText, "f-odds", l.id)}</div>
+      <div class="field ${l.uncertain ? "unsure" : ""}"><span>Odds <small>${l.uncertain ? "the +/- sign didn't come through. Check it against your slip" : "type +150, -110, 2.5, x9.3 or 5/2"}</small></span>${stepper(`f-odds-${l.id}`, l.oddsText, "f-odds", l.id)}</div>
       ${g
         ? `<div class="linked">${logo(g.away, 18)}${logo(g.home, 18)}<span>Tracking <b>${esc(g.shortName)}</b> · ${esc(relDay(g.date))} ${esc(fmtTime(g.date))}${l.market && l.market !== "other" ? " · auto-grades" : ""}</span><button class="link" data-act="form-unlink" data-id="${l.id}">Unlink</button></div>`
         : f.linking === l.id ? linkPicker(l) : `<button class="link" data-act="form-link" data-id="${l.id}">${icons.live} Link a game for live tracking & auto-grading</button>`}
@@ -1843,6 +1844,8 @@ const actions = {
   },
   "f-odds-step": (el) => {
     const l = formLeg(el.dataset.id);
+    l.uncertain = false;
+    document.getElementById(`f-odds-${l.id}`)?.closest(".field")?.classList.remove("unsure");
     l.odds = stepOdds(l.odds > 1 ? l.odds : americanToDecimal(-110), Number(el.dataset.dir), fmt());
     l.oddsText = formatOdds(l.odds, fmt());
     const inp = document.getElementById(`f-odds-${l.id}`);
@@ -2014,6 +2017,8 @@ const inputs = {
   "f-pick": (el) => (formLeg(el.dataset.id).pick = el.value),
   "f-odds": (el) => {
     const l = formLeg(el.dataset.id);
+    l.uncertain = false;
+    el.closest(".field")?.classList.remove("unsure");
     l.oddsText = el.value;
     const p = parseOdds(el.value);
     l.odds = p ? p.decimal : NaN;

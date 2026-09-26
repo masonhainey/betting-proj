@@ -298,7 +298,7 @@ textarea { height: auto; padding: 10px 12px; resize: vertical; }
 /* win probability in place of score slots */
 .wp { font-size: 17px; font-weight: 800; letter-spacing: -0.03em; min-width: 46px; text-align: right; color: var(--muted); }
 .wp.fav { color: var(--text); }
-.teams.big .wp { font-size: 26px; }
+.teams.lg .wp { font-size: 26px; }
 .wpbar { display: flex; gap: 3px; height: 5px; margin-top: 2px; }
 .wpbar i { display: block; height: 100%; border-radius: 99px; background: var(--c); min-width: 6px; opacity: .9; }
 
@@ -418,8 +418,8 @@ textarea { height: auto; padding: 10px 12px; resize: vertical; }
 .poss { width: 0; height: 0; border-left: 6px solid var(--amber); border-top: 5px solid transparent; border-bottom: 5px solid transparent; }
 .score { font-family: var(--mono); font-size: 20px; font-weight: 700; min-width: 30px; text-align: right; color: var(--muted); }
 .score.lead { color: var(--text); }
-.teams.big .score { font-size: 30px; }
-.teams.big .tname { font-size: 17px; }
+.teams.lg .score { font-size: 30px; }
+.teams.lg .tname { font-size: 17px; }
 .sit { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px; font-weight: 600; }
 .sit .lp, .lp { color: var(--muted); font-weight: 500; flex-basis: 100%; font-size: 12.5px; }
 .gcard footer { font-size: 12px; font-family: var(--mono); }
@@ -749,3 +749,8 @@ code { font-size: 12.5px; background: var(--card3); padding: 1px 5px; border-rad
 .match { margin-top: 8px; font-size: 12.5px; line-height: 1.45; color: var(--muted); padding: 8px 10px; border-radius: 10px; background: var(--amber-soft); }
 .match b { color: var(--text); }
 .match.ok { background: var(--win-soft); color: var(--win); font-weight: 650; }
+.chk { font-size: 10px; font-weight: 800; letter-spacing: 0.06em; text-transform: uppercase; padding: 2px 6px; border-radius: 5px; background: var(--amber-soft); color: var(--amber); margin-left: 8px; vertical-align: 2px; }
+.chk.ok { background: var(--win-soft); color: var(--win); }
+.field.unsure > span small { color: var(--amber); }
+.field.unsure .stepper { border-color: var(--amber); box-shadow: 0 0 0 3px var(--amber-soft); }
+.mk-grid + p { margin-top: 10px; }

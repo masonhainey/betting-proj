@@ -85,3 +85,87 @@ test("links picks to games and markets", () => {
   assert.equal(linkPick("Arch Manning 250+ pass yds", games), null);
   assert.equal(linkPick("uga", games), null, "lowercase abbreviations are too ambiguous");
 });
+
+test("fixes common OCR misreads in prices and money", async () => {
+  const { fixOcr } = await import("../js/slipparse.js");
+  assert.equal(fixOcr("Texas -7.5 -11O"), "Texas -7.5 -110");
+  assert.equal(fixOcr("Wager: S20.00"), "Wager: $20.00");
+  assert.equal(fixOcr("To Pay: $19З.4O".replace("З", "3")), "To Pay: $193.40");
+  assert.equal(fixOcr("Ohio State +1S0"), "Ohio State +150");
+  assert.equal(fixOcr("Stake $20,00"), "Stake $20.00");
+});
+
+test("recovers minus signs OCR dropped, using the ticket payout", () => {
+  // Real prices: -110, -115, -110, +140. OCR lost every sign.
+  const r = parseSlipText(`4 Leg Parlay
+Texas -7.5   110
+Michigan +7.5   115
+Over 56   110
+Clemson Moneyline   140
+Wager $10.00
+To Pay $163.53`);
+  assert.equal(r.legs.length, 4);
+  assert.deepEqual(r.legs.map((l) => am(l.odds)), [-110, -115, -110, 140]);
+  assert.ok(r.legs.every((l) => !l.uncertain));
+  assert.ok(r.oddsCheck < 0.03);
+});
+
+test("leaves unsure signs flagged when there's no payout to check against", () => {
+  const r = parseSlipText("Texas -7.5   110\nWager $10.00");
+  assert.equal(r.legs[0].uncertain, true);
+  assert.equal(am(r.legs[0].odds), -110);
+});
+
+test("FanDuel-style stacked slip with matchup lines", () => {
+  const r = parseSlipText(`FANDUEL
+3 LEG PARLAY +596
+Over 56
+TOTAL POINTS
+UCLA Bruins @ Miami Hurricanes
+-110
+Texas Longhorns -7.5
+SPREAD BETTING
+Texas Longhorns @ South Carolina Gamecocks
+-110
+Clemson Tigers
+MONEYLINE
+Auburn Tigers @ Clemson Tigers
+-135
+TOTAL WAGER
+$10.00
+POTENTIAL PAYOUT
+$69.60`);
+  assert.equal(r.book, "FanDuel");
+  assert.equal(r.legs.length, 3);
+  assert.deepEqual(r.legs.map((l) => l.pick), ["Over 56", "Texas Longhorns -7.5", "Clemson Tigers ML"]);
+  assert.equal(r.legs[0].context, "UCLA Bruins @ Miami Hurricanes");
+  assert.equal(r.stake, 10);
+  assert.equal(r.payout, 69.6);
+});
+
+test("matchup context places team-less legs and picks the right week", () => {
+  const now = Date.parse("2026-09-26T12:00:00Z");
+  const pool = [
+    { id: "wk2", date: "2026-10-03T19:00:00Z", home: T("Texas Longhorns", "Texas", "TEX"), away: T("Oklahoma Sooners", "Oklahoma", "OU") },
+    { id: "wk1", date: "2026-09-26T19:00:00Z", home: T("South Carolina Gamecocks", "South Carolina", "SC"), away: T("Texas Longhorns", "Texas", "TEX") },
+    { id: "m", date: "2026-09-26T20:00:00Z", home: T("Miami Hurricanes", "Miami", "MIA"), away: T("UCLA Bruins", "UCLA", "UCLA") },
+  ];
+  assert.equal(linkPick("Texas -7.5", pool, "", now).gameId, "wk1", "nearest game wins a tie");
+  assert.deepEqual(linkPick("Over 56", pool, "UCLA Bruins @ Miami Hurricanes", now), { gameId: "m", market: "total", side: "over", line: 56 });
+  assert.deepEqual(linkPick("Texas Longhorns -7.5", pool, "Oklahoma Sooners @ Texas Longhorns", now), { gameId: "wk2", market: "spread", side: "home", line: -7.5 });
+});
+
+test("wager and payout printed as two columns", () => {
+  const r = parseSlipText("3 LEG PARLAY +596\nOver 56 -110\nTOTAL WAGER    POTENTIAL PAYOUT\n$10.00    $69.60");
+  assert.equal(r.stake, 10);
+  assert.equal(r.payout, 69.6);
+  const flipped = parseSlipText("Over 56 -110\nPAYOUT   WAGER\n$69.60   $10.00");
+  assert.equal(flipped.stake, 10);
+  assert.equal(flipped.payout, 69.6);
+});
+
+test("moneyline label under the pick", () => {
+  const r = parseSlipText("Clemson Tigers -135\nMONEYLINE\nAuburn Tigers @ Clemson Tigers");
+  assert.equal(r.legs[0].pick, "Clemson Tigers ML");
+  assert.equal(r.legs[0].context, "Auburn Tigers @ Clemson Tigers");
+});
