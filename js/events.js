@@ -1,5 +1,6 @@
 // User input: click/input/change/keyboard handlers, drag & drop, paste, routing.
 
+import { friendsActions, handleJoinLink, onFriendsTab } from "./views/friends.js";
 import { shareActions, shareInputs, handleTailLink } from "./sheets/share.js";
 import { ymd } from "./espn.js";
 import { americanToDecimal, parseOdds, formatOdds, stepOdds, hedge, fmtMoney } from "./odds.js";
@@ -29,6 +30,7 @@ export function formLeg(id) {
 
 export const actions = {
   ...shareActions,
+  ...friendsActions,
   tab: (el) => {
     location.hash = el.dataset.v;
   },
@@ -698,6 +700,7 @@ export function handleAuthLink() {
 window.addEventListener("hashchange", () => {
   if (handleAuthLink()) return;
   if (handleTailLink()) return;
+  if (handleJoinLink()) return render();
   const t = location.hash.slice(1);
   if (TABS.includes(t)) {
     S.tab = t;
@@ -705,6 +708,7 @@ window.addEventListener("hashchange", () => {
     render();
     window.scrollTo({ top: 0 });
     if (t === "news" && !S.st.news.at) refreshNews();
+    if (t === "friends") onFriendsTab();
   }
 });
 

@@ -54,6 +54,14 @@ A lost parlay's detail view also names the leg or legs that sank it.
 - Nothing goes through a server: the ticket is encoded in the link, and everything decoded from a link is validated and escaped.
 - Tailed bets are tagged with who they came from, and Insights adds a **By source** table showing whose picks make you money.
 
+**Friends leaderboard** (needs accounts, plus [`supabase/friends.sql`](supabase/friends.sql) run once in Supabase).
+- Create a private group and send the invite link (or 6-character code).
+- Everyone's record, profit in **units** (so different bankrolls compare fairly) and ROI rank for this week, this month and the season, with streaks.
+- Tap a friend to see their stats and **open picks**, which you can tail in one tap.
+- Stakes are never shared, ghost bets don't count, and "Show my open picks" can be turned off.
+- Each member's app publishes its own summary, so it's an honor system among friends.
+- Demo mode shows a pretend group.
+
 **Import a slip.** Drop a screenshot onto the page, paste one, or pick one from your photos. You can also paste the share text or link your book gives you.
 - Screenshots are read in the browser with [Tesseract.js](https://github.com/naptha/tesseract.js). It's downloaded from jsDelivr the first time (~12 MB), and the image never leaves your device.
 - hedgehog pulls out the book, legs, odds, stake and payout, and matches each pick to a real game so it tracks live and auto-grades. You review everything before it's saved.
@@ -96,13 +104,15 @@ js/market.js       odds board markets, market sim, bet slip
 js/account.js      accounts & sync controller + account UI
 js/render.js       top-level render, sheet host, shared UI components
 js/events.js       click/input/keyboard handlers, drag & drop, paste, routing
-js/views/*.js      Bets, Live, Upcoming (schedule), Build, News tabs
+js/views/*.js      Bets, Live, Upcoming (schedule), Build, Friends, News tabs
 js/sheets/*.js     game, bet, add-a-pick, import, settings sheets
 js/espn.js         ESPN fetch + normalization (handles both odds formats ESPN has shipped)
 js/odds.js         American/decimal/fractional parsing, stepping, parlay, hedge, no-vig
 js/grade.js        bet model, live leg status, auto-grading, stats
 js/autopsy.js      ghost bets report + parlay autopsy
 js/share.js        share-link encode/decode (validated) + share text
+js/leaderboard.js  stats each member publishes + ranking
+js/friends.js      groups, members, publishing (Supabase)
 js/sharecard.js    share-card image (canvas)
 js/slipparse.js    bet-slip text → draft bet; matches picks to games
 js/ocr.js          lazy-loaded Tesseract.js OCR with dark-mode image cleanup
@@ -111,7 +121,7 @@ js/sync.js         local-first sync: change detection, tombstones, last-write-wi
 js/config.js       Supabase project URL + publishable key
 js/news.js         headline tagging
 js/demo.js         simulated data source with the same interface as espn.js
-supabase/          schema.sql to paste into Supabase
+supabase/          schema.sql (sync) and friends.sql (leaderboard) to paste into Supabase
 tests/             node --test
 ```
 

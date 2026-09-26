@@ -10,7 +10,7 @@ import { load, save, DEFAULT_SETTINGS } from "./store.js";
 
 export const settings = { ...DEFAULT_SETTINGS, ...load("settings", {}) };
 export const NS = settings.demo ? "demo." : "";
-export const TABS = ["bets", "live", "schedule", "build", "news"];
+export const TABS = ["bets", "live", "schedule", "build", "friends", "news"];
 export const BOOKS = ["DraftKings", "FanDuel", "BetMGM", "Caesars", "ESPN BET", "Fanatics", "bet365", "Hard Rock", "BetRivers", "Bovada", "Other"];
 
 export const S = {
@@ -39,7 +39,7 @@ export const game = (id) => S.games.get(id);
 export const fmt = () => settings.oddsFormat;
 export const odds = (d) => formatOdds(d, fmt());
 // Other modules plug in here (account.js schedules a sync after every save).
-export const hooks = { afterSave: () => {} };
+export const hooks = { afterSave: () => {}, afterSync: () => {} };
 export const saveBets = () => {
   save(NS + "bets", S.bets);
   hooks.afterSave();

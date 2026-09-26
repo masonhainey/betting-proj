@@ -54,6 +54,7 @@ export async function syncNow({ announce = false } = {}) {
       }
       save("sync", syncMeta);
       acct.lastSync = Date.now();
+      hooks.afterSync();
       acct.syncError = "";
       acct.status = "ok";
       const incoming = r.added + r.updated + r.removed;

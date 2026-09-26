@@ -1,5 +1,6 @@
 // Entry point.
 
+import { handleJoinLink, onFriendsTab } from "./views/friends.js";
 import { handleTailLink } from "./sheets/share.js";
 import * as cloud from "./cloud.js";
 import { icons } from "./ui.js";
@@ -7,12 +8,12 @@ import { CLOUD, syncNow } from "./account.js";
 import { loadCache, tick } from "./data.js";
 import { handleAuthLink } from "./events.js";
 import { render } from "./render.js";
-import { $, BOOKS, TABS } from "./state.js";
+import { $, BOOKS, S, TABS } from "./state.js";
 
 // ───────────────────────────── boot ─────────────────────────────
 
 function boot() {
-  $("#nav").innerHTML = TABS.map((t) => `<a href="#${t}" data-tab="${t}">${icons[t]}<span>${{ bets: "Bets", live: "Live", schedule: "Upcoming", build: "Build", news: "News" }[t]}</span></a>`).join("");
+  $("#nav").innerHTML = TABS.map((t) => `<a href="#${t}" data-tab="${t}">${icons[t]}<span>${{ bets: "Bets", live: "Live", schedule: "Upcoming", build: "Build", friends: "Friends", news: "News" }[t]}</span></a>`).join("");
   $("#books").innerHTML = BOOKS.map((b) => `<option value="${b}">`).join("");
   $("#btn-settings").innerHTML = icons.gear;
   $("#btn-add").innerHTML = `${icons.plus}<span>Add pick</span>`;
@@ -22,6 +23,8 @@ function boot() {
   loadCache();
   render();
   handleTailLink();
+  handleJoinLink();
+  if (S.tab === "friends") onFriendsTab();
   if (CLOUD) {
     handleAuthLink();
     if (cloud.currentUser()) syncNow();

@@ -67,6 +67,7 @@ async function request(path, { method = "GET", body, headers = {}, token } = {})
 }
 
 function friendly(status, msg) {
+  if (/could not find the (table|function)|relation .* does not exist|schema cache/i.test(msg)) return "The friends leaderboard isn't set up in Supabase yet (run supabase/friends.sql).";
   if (/invalid login credentials/i.test(msg)) return "Wrong email or password.";
   if (/email not confirmed/i.test(msg)) return "Confirm your email first: tap the link in the email from Supabase, then sign in here.";
   if (/already (been )?registered|already exists/i.test(msg)) return "There's already an account with that email. Sign in instead.";
@@ -167,6 +168,16 @@ export async function signOut() {
   clearSession();
   if (tk) request("/auth/v1/logout", { method: "POST", token: tk }).catch(() => {});
 }
+
+/** Signed-in REST calls for other tables and database functions (friends leaderboard). */
+export const api = {
+  get: (path) => authed(`/rest/v1/${path}`),
+  rpc: (fn, args) => authed(`/rest/v1/rpc/${fn}`, { method: "POST", body: args }),
+  upsert: (table, rows, onConflict) =>
+    authed(`/rest/v1/${table}?on_conflict=${onConflict}`, { method: "POST", body: rows, headers: { Prefer: "resolution=merge-duplicates,return=minimal" } }),
+  patch: (path, body) => authed(`/rest/v1/${path}`, { method: "PATCH", body, headers: { Prefer: "return=minimal" } }),
+  del: (path) => authed(`/rest/v1/${path}`, { method: "DELETE", headers: { Prefer: "return=minimal" } }),
+};
 
 const COLS = "id,kind,data,deleted,updated_at,synced_at";
 

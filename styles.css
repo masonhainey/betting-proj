@@ -887,3 +887,55 @@ code { font-size: 12.5px; background: var(--card3); padding: 1px 5px; border-rad
 .tail-actions + .muted { margin-top: 10px; }
 .tail-tag { font-size: 11.5px; font-weight: 700; color: var(--blue); white-space: nowrap; }
 @media (max-width: 400px) { .share-actions { grid-template-columns: 1fr 1fr; } .share-actions .btn:first-child { grid-column: 1 / -1; } }
+
+/* ───────── friends leaderboard ───────── */
+.avatar { display: inline-grid; place-items: center; width: var(--sz, 38px); height: var(--sz, 38px); border-radius: 50%; flex: none; font-weight: 800; font-size: calc(var(--sz, 38px) * 0.36); color: #fff; background: linear-gradient(135deg, hsl(var(--h) 65% 52%), hsl(calc(var(--h) + 40) 60% 38%)); letter-spacing: -0.02em; }
+.fr-groups { margin-top: 10px; }
+.fr-board { padding: 16px; margin-top: 8px; }
+.fr-board-h { display: flex; align-items: center; gap: 8px; }
+.fr-board-h > div { flex: 1; min-width: 0; }
+.fr-board-h h2 { font-size: 20px; }
+.fr-controls { display: flex; gap: 8px; flex-wrap: wrap; justify-content: space-between; margin: 14px 0 10px; }
+.lb { display: flex; flex-direction: column; gap: 6px; }
+.lb-row { display: flex; align-items: center; gap: 12px; width: 100%; text-align: left; padding: 10px 12px; border-radius: 14px; background: var(--card2); border: 1px solid transparent; }
+.lb-row:hover { border-color: var(--line2); }
+.lb-row.me { border-color: color-mix(in srgb, var(--accent) 45%, transparent); background: linear-gradient(90deg, var(--accent-soft), transparent 70%), var(--card2); }
+.lb-rank { width: 28px; text-align: center; font-weight: 800; color: var(--muted); font-size: 15px; flex: none; }
+.lb-row.top .lb-rank { font-size: 22px; }
+.lb-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.lb-main b { font-size: 15.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-main em { font-style: normal; font-size: 10.5px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; color: var(--accent); margin-left: 4px; }
+.lb-main small { color: var(--muted); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.lb-units { font-family: var(--display); font-size: 20px; font-weight: 800; letter-spacing: -0.03em; min-width: 64px; text-align: right; }
+.streak { font-size: 11.5px; font-weight: 800; padding: 3px 7px; border-radius: 99px; white-space: nowrap; }
+.streak.hot { background: var(--amber-soft); color: var(--amber); }
+.streak.cold { background: rgba(108,178,255,.13); color: var(--blue); }
+.fr-lonely { margin-top: 12px; }
+.fr-feed { margin-top: 6px; }
+.fp { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 12px; background: var(--card); border: 1px solid var(--line); margin-bottom: 8px; }
+.fp-main { flex: 1; min-width: 0; font-size: 14px; }
+.fp-legs { font-size: 13px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fp-odds { font-weight: 800; font-size: 15px; }
+.fp.won { border-color: color-mix(in srgb, var(--win) 40%, var(--line)); }
+.fp.lost { opacity: 0.75; }
+.fr-pitch { padding: 28px 22px; text-align: center; margin-top: 16px; display: flex; flex-direction: column; align-items: center; gap: 10px; }
+.fr-pitch-art { font-size: 40px; letter-spacing: 6px; }
+.fr-pitch h2 { font-size: 24px; }
+.fr-pitch p { max-width: 460px; }
+.fr-start { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); margin-top: 12px; }
+.fr-start-card { padding: 16px; }
+.fr-start-card h2 { font-size: 18px; }
+.code-in { text-transform: uppercase; letter-spacing: 0.25em; font-weight: 800; }
+.invite-box { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 18px; border-radius: 16px; background: linear-gradient(135deg, var(--accent-soft), transparent 70%), var(--card2); text-align: center; margin-bottom: 8px; }
+.invite-code { font-family: var(--display); font-size: 40px; font-weight: 900; letter-spacing: 0.18em; }
+.invite-box .dactions { margin-top: 4px; justify-content: center; }
+.fr-honor { margin-top: 12px; }
+.mem-top { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; }
+.mem-top > div { flex: 1; }
+.mem-top b { font-size: 18px; }
+@media (max-width: 859px) {
+  .nav a { font-size: 10.5px; padding: 6px 2px; }
+  .nav a svg { width: 21px; height: 21px; }
+  .fr-controls .seg { flex: 1; }
+  .fr-controls .seg button { flex: 1; }
+}

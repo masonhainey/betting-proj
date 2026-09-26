@@ -75,6 +75,11 @@ export function decodeShare(code) {
   } catch {
     return null;
   }
+  return sanitizeShare(raw);
+}
+
+/** Validate a payload object (from a link, or from a friend's published picks). */
+export function sanitizeShare(raw) {
   if (!raw || typeof raw !== "object" || raw.v !== 1 || !Array.isArray(raw.l)) return null;
   const legs = raw.l.slice(0, MAX_LEGS).map((l) => {
     if (!l || typeof l !== "object") return null;
