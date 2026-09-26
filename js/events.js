@@ -3,7 +3,8 @@
 import { enableAlerts, disableAlerts, notify, setPref, unsubscribePush } from "./alerts.js";
 import { alertsHtml } from "./sheets/settings.js";
 import { friendsActions, handleJoinLink, onFriendsTab } from "./views/friends.js";
-import { shareActions, shareInputs, handleTailLink } from "./sheets/share.js";
+import { copy, shareActions, shareInputs, handleTailLink } from "./sheets/share.js";
+import { installerCode } from "./widget.js";
 import { ymd } from "./espn.js";
 import { americanToDecimal, parseOdds, formatOdds, stepOdds, hedge, fmtMoney } from "./odds.js";
 import { betStatus, potentialPayout, legLabel } from "./grade.js";
@@ -427,6 +428,11 @@ export const actions = {
     await disableAlerts();
     toast("Alerts are off on this device");
     paintAlerts();
+  },
+  "widget-copy": async () => {
+    const site = location.origin + location.pathname.replace(/[^/]*$/, "");
+    const ok = await copy(installerCode(site));
+    toast(ok ? "Installer copied. Paste it into a new Scriptable script" : "Couldn't copy. Try again", ok ? "" : "err");
   },
   "alerts-test": async () => {
     const ok = await notify({ title: "💰 Cashed: Texas -7.5 (test)", body: "+$18.18 · pays $38.18. This is what a result alert looks like.", tag: "test", url: "#bets" });

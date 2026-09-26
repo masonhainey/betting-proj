@@ -109,7 +109,7 @@ export function sheetShare() {
     <code class="share-link" id="share-link">${esc(url)}</code>`;
 }
 
-async function copy(text) {
+export async function copy(text) {
   try {
     await navigator.clipboard.writeText(text);
     return true;

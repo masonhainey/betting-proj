@@ -21,4 +21,10 @@ export default [
     languageOptions: { ecmaVersion: 2024, sourceType: "module", globals: { process: "readonly", console: "readonly", fetch: "readonly", Intl: "readonly", URL: "readonly", setTimeout: "readonly", clearTimeout: "readonly", AbortController: "readonly" } },
     rules: { "no-undef": "error", "no-unused-vars": ["error", { args: "none", caughtErrors: "none" }] },
   },
+  {
+    // Scriptable (iOS) globals are declared at the top of widget/src/core.js.
+    files: ["widget/src/**/*.js"],
+    languageOptions: { ecmaVersion: 2024, sourceType: "module", globals: { Intl: "readonly", JSON: "readonly", Date: "readonly", module: "readonly" } },
+    rules: { "no-undef": "error", "no-unused-vars": ["error", { args: "none", caughtErrors: "none" }] },
+  },
 ];

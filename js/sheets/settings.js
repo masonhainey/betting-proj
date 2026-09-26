@@ -13,6 +13,8 @@ export function sheetSettings() {
     <div id="acct">${accountHtml()}</div>
     <h3 class="sh3">Alerts</h3>
     <div id="alerts-box">${alertsHtml()}</div>
+    <h3 class="sh3">Home Screen widget</h3>
+    ${widgetHtml()}
     <div class="set-row"><div><b>Default odds format</b><p class="muted small">Every price in the app switches; you can still type either kind anywhere.</p></div>${fmtToggle("set-fmt")}</div>
     <div class="set-row"><div><b>Unit size</b><p class="muted small">Default stake for new picks and slip previews.</p></div><label class="stake"><span>$</span><input id="set-unit" data-in="set-unit" inputmode="decimal" value="${esc(settings.unit)}"></label></div>
     <div class="set-row"><div><b>Auto-accept line changes</b><p class="muted small">When a price in your slip moves, take the new number instead of asking.</p></div><label class="switch ${settings.autoAccept ? "on" : ""}"><input type="checkbox" data-act="set-auto" ${settings.autoAccept ? "checked" : ""}><span class="knob"></span></label></div>
@@ -65,5 +67,20 @@ export function alertsHtml() {
       : `<p class="small">Get a notification when a leg hits, a bet cashes or loses, your games kick off, and when your team gets in the red zone.</p>
          <button class="btn primary block" data-act="alerts-on">Turn on alerts</button>
          ${signedIn ? "" : `<p class="muted small">Tip: sign in above too, so alerts reach you even with hedgehog closed.</p>`}`}
+  </div>`;
+}
+
+export function widgetHtml() {
+  const signedIn = CLOUD && cloud.currentUser();
+  return `<div class="alert-box widget-box">
+    <p class="small">Your open bets and live sweat on your iPhone Home Screen and Lock Screen, refreshed about every 5 minutes while your games are on. It runs in the free <b>Scriptable</b> app.</p>
+    <ol class="small muted steps">
+      <li>Install <b>Scriptable</b> from the App Store</li>
+      <li>Tap <b>Copy installer</b> below. In Scriptable, tap <b>+</b>, paste, and name it <b>hedgehog</b></li>
+      <li>Tap ▶︎ once and sign in with your hedgehog email and password</li>
+      <li>Long-press your Home Screen → <b>+</b> → Scriptable → pick a size. Tap the new widget and choose <b>hedgehog</b> as the Script. Lock Screen: Customize → add Scriptable the same way</li>
+    </ol>
+    <button class="btn primary block" data-act="widget-copy">Copy installer</button>
+    ${signedIn ? "" : `<p class="muted small">The widget reads your bets from your account, so sign in above first.</p>`}
   </div>`;
 }

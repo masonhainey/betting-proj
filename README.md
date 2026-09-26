@@ -94,6 +94,18 @@ With `js/config.js` left empty, the app runs local-only, exactly as before.
 
 To skip the confirmation email on sign-up, turn off **Authentication → Sign In / Providers → Email → Confirm email**. That's reasonable for a personal app.
 
+## iPhone widgets (Scriptable)
+
+Your open bets on the Home Screen (small, medium, large) and Lock Screen (inline, rectangular, circular), with live status for each bet, today's result, and money at risk and to win. It refreshes about every 5 minutes while your games are on and in time for the next kickoff otherwise. iOS decides the exact timing.
+
+Setup is in **Settings → Home Screen widget**. Copy the installer, paste it into a new script in the free [Scriptable](https://scriptable.app) app, run it once to sign in, then add a Scriptable widget and pick that script.
+
+- The installer is a short loader. Each run it downloads `widget/hedgehog-widget.js` from this site and keeps a copy for offline use, so widget updates arrive with the site.
+- The widget signs in with its own session, so it never signs the app out. Your email and password are stored in the iPhone Keychain.
+- If a refresh fails, it shows the last good data with a ⚠︎ and the time.
+- Games that finished before you opened the app are graded in memory, so the widget is current even when the app hasn't graded them yet.
+- The source is in `widget/src/` and reuses the app's own grading and ESPN code. Rebuild with `npm run build:widget` (CI checks the committed bundle is up to date).
+
 ## How it holds up when feeds fail
 
 - Schedule requests go out a week at a time. If one fails, that week is fetched day by day, and games already on screen for a day that fails stay there.
@@ -123,6 +135,9 @@ js/friends.js      groups, members, publishing (Supabase)
 js/alerts.js       notification permission, local alerts, push subscription
 js/alertrules.js   what triggers an alert and its wording (shared with the worker)
 scripts/           alerts-worker.mjs (scheduled push sender)
+widget/src/        Scriptable widget: model.js (what to show, pure) + core.js (sign-in, fetch, drawing)
+widget/hedgehog-widget.js  bundled widget the installer downloads (generated)
+js/widget.js       the Scriptable installer text
 js/sharecard.js    share-card image (canvas)
 js/slipparse.js    bet-slip text → draft bet; matches picks to games
 js/ocr.js          lazy-loaded Tesseract.js OCR with dark-mode image cleanup

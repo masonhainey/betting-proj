@@ -25,6 +25,8 @@ jobs:
           node-version: 22
       - run: npm test
       - run: npm run lint
+      - name: Widget bundle is up to date
+        run: npm run build:widget && git diff --exit-code widget/hedgehog-widget.js
 
   deploy:
     needs: test
@@ -35,7 +37,7 @@ jobs:
       url: ${{ steps.deploy.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
-      - run: mkdir _site && cp -r index.html styles.css manifest.webmanifest sw.js js icons _site/
+      - run: mkdir _site && cp -r index.html styles.css manifest.webmanifest sw.js js icons widget _site/
       - uses: actions/upload-pages-artifact@v3
       - id: deploy
         uses: actions/deploy-pages@v4
