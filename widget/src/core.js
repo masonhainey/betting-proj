@@ -8,12 +8,11 @@
 /* global ListWidget, Color, Font, LinearGradient, Size, Request, Keychain, Alert, config, Script, FileManager, Safari */
 
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from "../../js/config.js";
-import { normalizeEvent } from "../../js/espn.js";
+import { normalizeEvent, scoreboardUrl } from "../../js/espn.js";
 import { buildModel, daysToFetch } from "./model.js";
 
 export { buildModel, daysToFetch };
 
-const ESPN = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard";
 const KEY = { email: "hedgehog.email", password: "hedgehog.password", session: "hedgehog.session" };
 
 const C = {
@@ -94,11 +93,12 @@ async function loadBets(access) {
 async function loadGames(days) {
   const games = new Map();
   await Promise.all(
-    days.map(async (d) => {
+    days.map(async (key) => {
+      const [sport, d] = key.split("|");
       try {
-        const data = await http(`${ESPN}?dates=${d}&groups=80&limit=500`);
+        const data = await http(scoreboardUrl(d, sport));
         for (const ev of data?.events || []) {
-          const g = normalizeEvent(ev);
+          const g = normalizeEvent(ev, sport);
           if (g) games.set(g.id, g);
         }
       } catch {}

@@ -4,7 +4,7 @@ import { addDays } from "../espn.js";
 
 import { esc, tzAbbr, fmtTime, fmtDay, dayKey, startOfDay, ago, relDay, logo, rank, icons, rankedBadge, winProb, pct, wpBar } from "../ui.js";
 import { chip, errorBox, kickBadge, lineSummary, myActionCount, skeleton, staleNote } from "../render.js";
-import { S, game } from "../state.js";
+import { S, SP, game } from "../state.js";
 
 // ── Schedule ──
 
@@ -13,7 +13,7 @@ export function viewSchedule() {
   const q = S.f.q.trim().toLowerCase();
   let gs = S.scheduleIds.map(game).filter(Boolean);
   const total = gs.length;
-  if (S.f.top25) gs = gs.filter((g) => g.home.rank || g.away.rank);
+  if (S.f.top25 && SP().ranked) gs = gs.filter((g) => g.home.rank || g.away.rank);
   if (S.f.hasLine) gs = gs.filter((g) => g.odds);
   if (q) gs = gs.filter((g) => `${g.home.name} ${g.away.name} ${g.home.abbr} ${g.away.abbr} ${g.tv}`.toLowerCase().includes(q));
   gs.sort((a, b) => new Date(a.date) - new Date(b.date) || (a.timeValid ? 0 : 1) - (b.timeValid ? 0 : 1));
@@ -26,13 +26,13 @@ export function viewSchedule() {
   }
   const from = addDays(startOfDay(), 1);
   const head = `<div class="view-h">
-    <div><div class="eyebrow">Next four weeks</div><h1>Upcoming</h1>
+    <div><div class="eyebrow">${SP().label} · next four weeks</div><h1>Upcoming</h1>
       <p class="muted">From ${esc(fmtDay(from))} · next 4 weeks · times in ${esc(tzAbbr)} · <span class="upd">${st.loading ? "checking for changes…" : `checked <span data-ago="${st.at || st.cachedAt || 0}">${ago(st.at || st.cachedAt)}</span>`}</span></p></div>
     <button class="icon-btn" data-act="refresh" data-v="schedule" aria-label="Refresh">${icons.refresh}</button>
   </div>
   <div class="toolbar">
     <label class="search">${icons.search}<input id="sched-q" data-in="sched-q" type="search" placeholder="Team or network" value="${esc(S.f.q)}" autocomplete="off"></label>
-    ${chip("Top 25", "sched-top25", "", S.f.top25)}${chip("Has line", "sched-line", "", S.f.hasLine)}
+    ${SP().ranked ? chip("Top 25", "sched-top25", "", S.f.top25) : ""}${chip("Has line", "sched-line", "", S.f.hasLine)}
   </div>
   ${moved ? `<div class="notice">${icons.clock}<span><b>${moved} kickoff${moved > 1 ? "s" : ""} changed</b> since you last looked — marked below.</span></div>` : ""}`;
   if (!total) {

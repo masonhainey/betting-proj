@@ -11,7 +11,8 @@ import { sheetBet } from "./sheets/bet.js";
 import { sheetGame } from "./sheets/game.js";
 import { sheetImport } from "./sheets/import.js";
 import { sheetSettings } from "./sheets/settings.js";
-import { $, $$, S, fmt, odds, settings, swap } from "./state.js";
+import { $, $$, fmt, odds, S, settings, sport, swap } from "./state.js";
+import { SPORTS } from "./espn.js";
 import { viewBets } from "./views/bets.js";
 import { slipHtml, viewBuild } from "./views/build.js";
 import { viewLive } from "./views/live.js";
@@ -25,6 +26,8 @@ export function render() {
   $$(".nav a").forEach((a) => a.classList.toggle("on", a.dataset.tab === S.tab));
   $("#fmt-toggle").innerHTML = fmtToggle("set-fmt");
   $("#demo-flag").hidden = !settings.demo;
+  document.body.dataset.sport = sport();
+  $("#sport-toggle").innerHTML = Object.values(SPORTS).map((x) => `<button data-act="sport" data-v="${x.key}" class="${x.key === sport() ? "on" : ""}" aria-pressed="${x.key === sport()}">${x.label}</button>`).join("");
   const views = { bets: viewBets, live: viewLive, schedule: viewSchedule, build: viewBuild, friends: viewFriends, news: viewNews };
   swap($("#view"), views[S.tab]());
   paintDock();

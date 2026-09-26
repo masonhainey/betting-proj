@@ -69,7 +69,7 @@ function demoBoard() {
     const mk = (f) => ({ w: Math.round(w * f), l: Math.round(l * f), p: 0, n: Math.round((w + l) * f), units: Math.round(units * f * 10) / 10, roi: Math.round((units / ((w + l) * 1.1)) * 1000) / 1000 });
     stats[`demo-${i}`] = {
       stats: { periods: { week: mk(0.3), month: mk(0.7), season: mk(1) }, streak, open: 1 },
-      picks: { open: pickFor(i).map((b) => ({ v: 1, k: "bet", i: b.id, n: name, t: b.createdAt, l: b.legs.map((l) => ({ p: l.pick, o: l.odds, g: l.gameId, m: l.market, d: l.side, n: l.line, gl: l.gameLabel, k: l.kickoff })) })), recent: [] },
+      picks: { open: pickFor(i).map((b) => ({ v: 1, k: "bet", i: b.id, n: name, t: b.createdAt, l: b.legs.map((l) => ({ p: l.pick, o: l.odds, g: l.gameId, sp: l.sport, m: l.market, d: l.side, n: l.line, gl: l.gameLabel, k: l.kickoff })) })), recent: [] },
       updated_at: new Date(Date.now() - (i + 1) * 17 * 60000).toISOString(),
     };
   });

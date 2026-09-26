@@ -114,7 +114,7 @@ export function openDraft() {
     const m = linkPick(l.pick, pool, l.context);
     if (m) {
       const g = game(m.gameId);
-      Object.assign(leg, m, { gameLabel: g.shortName, kickoff: g.date });
+      Object.assign(leg, m, { gameLabel: g.shortName, kickoff: g.date, sport: g.sport });
       if (m.market !== "other") linked++;
     }
     return leg;

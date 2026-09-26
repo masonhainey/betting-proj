@@ -35,6 +35,9 @@ export const S = {
 };
 
 export const src = () => (settings.demo ? demo : espn);
+/** The league you're looking at ("cfb" | "nfl"). Bets cover both; the game views follow this. */
+export const sport = () => (settings.sport === "nfl" ? "nfl" : "cfb");
+export const SP = () => espn.sportOf(sport());
 export const game = (id) => S.games.get(id);
 export const fmt = () => settings.oddsFormat;
 export const odds = (d) => formatOdds(d, fmt());

@@ -6,7 +6,7 @@ import { esc, fmtTime, dayKey, relDay, logo, rank, icons } from "../ui.js";
 
 import { boardGames, markets, selByKey, slipCalc } from "../market.js";
 import { chip, fmtToggle, selBtn, skeleton } from "../render.js";
-import { S, fmt, game, num, odds, settings } from "../state.js";
+import { S, SP, fmt, game, num, odds, settings } from "../state.js";
 
 // ── Build ──
 
@@ -29,7 +29,7 @@ export function viewBuild() {
   return `<div class="build">
     <div class="build-main">
       <div class="view-h">
-        <div><div class="eyebrow">Slip builder</div><h1>Build</h1><p class="muted">Tap prices to build a slip. ${provider ? `Lines: ${esc(provider)} via ESPN` : "Lines from ESPN"} · refreshes automatically.</p></div>
+        <div><div class="eyebrow">${SP().label} slip builder</div><h1>Build</h1><p class="muted">Tap prices to build a slip. ${provider ? `Lines: ${esc(provider)} via ESPN` : "Lines from ESPN"} · refreshes automatically.</p></div>
       </div>
       <div class="toolbar">
         <label class="switch ${S.sim ? "on" : ""}" title="Simulate a live market: prices tick every couple seconds so you can see how your slip reacts. Real lines are unchanged."><input type="checkbox" data-act="sim" ${S.sim ? "checked" : ""}><span class="knob"></span>Market sim</label>

@@ -76,6 +76,12 @@ A lost parlay's detail view also names the leg or legs that sank it.
 
 **Ticket payout.** Books don't always pay exactly what the leg odds multiply to. They round each leg's price, price same-game parlays with their own correlation math, and prices can move between building a slip and placing it. Enter the payout printed on your ticket, either when adding the bet or later from the bet's detail view. hedgehog will use that number and show how far off the leg math was.
 
+## College football and NFL
+
+The **CFB | NFL** switch in the header swaps Live, Upcoming, Build and News between leagues. Your choice is remembered on each device.
+
+Bets, stats, friends and alerts cover both leagues at once. Every linked pick remembers its league, so an NFL bet keeps tracking and settles itself while you're looking at college games (and the other way round). The same goes for the iPhone widget and closed-app alerts. Picks saved before this change count as college football.
+
 ## Accounts & sync (optional)
 
 Create an account with your email and a password, and your bets and settings stay in sync across your phone and computer.

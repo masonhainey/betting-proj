@@ -5,7 +5,7 @@ import { betStatus } from "../grade.js";
 import { TAGS, mentionsTeam } from "../news.js";
 import { esc, ago, relDay, logo, icons } from "../ui.js";
 import { chip, errorBox, skeleton } from "../render.js";
-import { S, game } from "../state.js";
+import { S, SP, game } from "../state.js";
 
 // ── News ──
 
@@ -26,7 +26,7 @@ export function viewNews() {
   else if (f !== "all" && f !== "move") arts = arts.filter((a) => a.tags.includes(f));
   const counts = Object.fromEntries(Object.keys(TAGS).map((k) => [k, S.news.filter((a) => a.tags.includes(k)).length]));
   counts.move = moves.length;
-  const head = `<div class="view-h"><div><div class="eyebrow">The wire</div><h1>News & moves</h1><p class="muted">Injuries, line movement, pressers and look-aheads · <span class="upd">${st.loading ? "updating…" : `updated <span data-ago="${st.at || 0}">${ago(st.at)}</span>`}</span></p></div>
+  const head = `<div class="view-h"><div><div class="eyebrow">${SP().label} wire</div><h1>News & moves</h1><p class="muted">Injuries, line movement, pressers and look-aheads · <span class="upd">${st.loading ? "updating…" : `updated <span data-ago="${st.at || 0}">${ago(st.at)}</span>`}</span></p></div>
     <button class="icon-btn" data-act="refresh" data-v="news" aria-label="Refresh">${icons.refresh}</button></div>
     <div class="chips scroll">
       ${chip("All", "news-f", "all", f === "all")}

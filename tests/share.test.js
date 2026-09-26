@@ -19,12 +19,19 @@ test("round trip keeps the ticket and hides the stake unless asked", () => {
   assert.equal(t.stake, undefined);
   assert.equal(t.ticketPayout, undefined);
   assert.equal(t.legs.length, 3);
-  assert.deepEqual(t.legs[0], { pick: "Texas -7.5", odds: 1.9091, status: "open", gameId: "401628374", market: "spread", side: "home", line: -7.5, gameLabel: "TEX @ SC", kickoff: "2026-09-26T19:30:00.000Z" });
+  assert.deepEqual(t.legs[0], { pick: "Texas -7.5", odds: 1.9091, status: "open", gameId: "401628374", sport: "cfb", market: "spread", side: "home", line: -7.5, gameLabel: "TEX @ SC", kickoff: "2026-09-26T19:30:00.000Z" });
   assert.equal(t.legs[1].status, "won");
   assert.equal(t.legs[2].pick, "Heisman: Arch Manning ✨");
   const withStake = decodeShare(encodeShare(bet, { includeStake: true }));
   assert.equal(withStake.stake, 20);
   assert.equal(withStake.ticketPayout, 139.2);
+});
+
+test("NFL picks keep their league through a link; old links default to college", () => {
+  const nfl = { ...bet, legs: [{ ...bet.legs[0], pick: "Chiefs -3", gameId: "401772001", sport: "nfl" }] };
+  assert.equal(decodeShare(encodeShare(nfl)).legs[0].sport, "nfl");
+  assert.equal(decodeShare(toB64url(JSON.stringify({ v: 1, l: [{ p: "UGA -3", o: 1.9, g: "401", sp: "<script>" }] }))).legs[0].sport, "cfb");
+  assert.equal(decodeShare(toB64url(JSON.stringify({ v: 1, l: [{ p: "Heisman", o: 9 }] }))).legs[0].sport, undefined, "no game, no league");
 });
 
 test("links stay short enough for a text message", () => {

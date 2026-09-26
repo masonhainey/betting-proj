@@ -31,7 +31,7 @@ export function relinkLegs(bets, games) {
       const m = linkPick(leg.pick, pool, leg.gameLabel || "", Date.parse(leg.kickoff) || placed);
       if (!m || !GRADEABLE.has(m.market) || (m.market !== "total" && !m.side)) continue;
       const g = pool.find((x) => x.id === m.gameId);
-      Object.assign(leg, m, { gameLabel: g.shortName, kickoff: g.date, autoLinked: true });
+      Object.assign(leg, m, { gameLabel: g.shortName, kickoff: g.date, sport: g.sport || "cfb", autoLinked: true });
       if (m.line === undefined) delete leg.line;
       changed.push({ bet, leg });
     }

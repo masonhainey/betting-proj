@@ -87,7 +87,7 @@ export function viewBets() {
       ? `<div class="bet-list">${groupByDay(arr, S.f.betsTab === "open" ? (b) => b.createdAt : (b) => b.settledAt || b.createdAt).map(([k, bs]) => `<div class="day-h">${esc(k)}</div>${bs.map(betCard).join("")}`).join("")}</div>`
       : `<div class="empty">${S.f.betsTab === "open" ? "No open bets. Tap <b>Add pick</b> or build a slip." : "Nothing settled yet."}</div>`;
   }
-  const page = `<div class="view-h page"><div><div class="eyebrow">Game day workspace</div><h1>College football</h1><p class="muted">Track straight bets and parlays alongside live scores.</p></div></div>`;
+  const page = `<div class="view-h page"><div><div class="eyebrow">Game day workspace</div><h1>Your bets</h1><p class="muted">College football and NFL: straight bets and parlays alongside live scores.</p></div></div>`;
   const syncBanner = CLOUD && !cloud.currentUser() && !settings.syncBannerDismissed
     ? `<div class="notice sync-banner">${icons.cloud}<span><b>Keep your phone and computer in sync.</b> Create a free account and your bets follow you everywhere.</span><button class="btn sm primary" data-act="open-settings">Sign in</button><button class="icon-btn sm" data-act="dismiss-sync" aria-label="Dismiss">${icons.x}</button></div>`
     : "";

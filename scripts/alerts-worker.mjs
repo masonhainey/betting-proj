@@ -65,7 +65,7 @@ export async function run({ db, send, generateKeys, fetchGames = defaultFetchGam
       for (const l of b.legs) {
         if (l.status !== "open" || !l.gameId || !l.kickoff) continue;
         const t = Date.parse(l.kickoff);
-        if (t >= since && t <= now.getTime() + 6 * 3600e3) days.add(etDay(t));
+        if (t >= since && t <= now.getTime() + 6 * 3600e3) days.add(`${l.sport === "nfl" ? "nfl" : "cfb"}|${etDay(t)}`);
       }
     }
   }
@@ -107,11 +107,12 @@ export async function run({ db, send, generateKeys, fetchGames = defaultFetchGam
 
 async function defaultFetchGames(days) {
   const games = new Map();
-  for (const d of days) {
+  for (const key of days) {
+    const [sport, d] = key.split("|");
     try {
-      for (const g of await fetchScoreboard(d)) games.set(g.id, g);
+      for (const g of await fetchScoreboard(d, { sport })) games.set(g.id, g);
     } catch (e) {
-      console.log(`Scoreboard ${d} failed: ${e.message}`);
+      console.log(`Scoreboard ${key} failed: ${e.message}`);
     }
   }
   return games;

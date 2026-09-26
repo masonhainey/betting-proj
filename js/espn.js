@@ -1,7 +1,14 @@
 // ESPN's public site API. It serves CORS headers, so the browser calls it directly —
 // no relay to break. Every response gets normalized into one flat Game shape.
 
-const BASE = "https://site.api.espn.com/apis/site/v2/sports/football/college-football";
+const ROOT = "https://site.api.espn.com/apis/site/v2/sports/football";
+
+/** The leagues hedgehog follows. Every game and every linked leg carries one of these keys. */
+export const SPORTS = {
+  cfb: { key: "cfb", path: "college-football", groups: "80", label: "CFB", name: "College football", games: "FBS games", ranked: true, logos: "ncaa" },
+  nfl: { key: "nfl", path: "nfl", groups: null, label: "NFL", name: "NFL", games: "NFL games", ranked: false, logos: "nfl" },
+};
+export const sportOf = (k) => SPORTS[k] || SPORTS.cfb;
 export const FBS = "80";
 
 async function getJSON(url, { timeout = 12000, retries = 1 } = {}) {
@@ -30,10 +37,15 @@ export const ymd = (d) =>
 export const etDay = (d) =>
   new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(d)).replaceAll("-", "");
 
-export async function fetchScoreboard(dates, { groups = FBS } = {}) {
-  const url = `${BASE}/scoreboard?dates=${dates}&groups=${groups}&limit=500`;
-  const data = await getJSON(url);
-  return (data.events || []).map(normalizeEvent).filter(Boolean);
+/** ESPN scoreboard URL for a date or date range ("20260927" or "20260927-20261003"). */
+export function scoreboardUrl(dates, sport = "cfb") {
+  const sp = sportOf(sport);
+  return `${ROOT}/${sp.path}/scoreboard?dates=${dates}${sp.groups ? `&groups=${sp.groups}` : ""}&limit=500`;
+}
+
+export async function fetchScoreboard(dates, { sport = "cfb" } = {}) {
+  const data = await getJSON(scoreboardUrl(dates, sport));
+  return (data.events || []).map((ev) => normalizeEvent(ev, sport)).filter(Boolean);
 }
 
 /**
@@ -71,8 +83,8 @@ export async function fetchRange(start, days, opts) {
   return { games: [...byId.values()], failedDays };
 }
 
-export async function fetchNews(limit = 40) {
-  const data = await getJSON(`${BASE}/news?limit=${limit}`);
+export async function fetchNews({ sport = "cfb", limit = 40 } = {}) {
+  const data = await getJSON(`${ROOT}/${sportOf(sport).path}/news?limit=${limit}`);
   return (data.articles || []).map(normalizeArticle).filter(Boolean);
 }
 
@@ -146,7 +158,7 @@ export function normalizeOdds(o, home, away) {
   return out.ml || out.spread || out.total ? out : null;
 }
 
-export function normalizeEvent(ev) {
+export function normalizeEvent(ev, sport = "cfb") {
   const comp = ev?.competitions?.[0];
   if (!comp) return null;
   const home = team(comp.competitors?.find((c) => c.homeAway === "home"));
@@ -157,6 +169,7 @@ export function normalizeEvent(ev) {
   const sit = comp.situation;
   return {
     id: String(ev.id),
+    sport,
     date: comp.date || ev.date,
     timeValid: comp.timeValid !== false,
     name: ev.name,

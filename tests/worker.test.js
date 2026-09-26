@@ -61,7 +61,7 @@ test("sends each new result once, to the right devices, honoring prefs", async (
   };
   const r1 = await run(opts);
   assert.equal(state.vapid.publicKey, "PUB", "keys created on first run");
-  assert.deepEqual(fetchedDays, ["20260926"], "ESPN day in US Eastern time");
+  assert.deepEqual(fetchedDays, ["cfb|20260926"], "ESPN day in US Eastern time, league defaults to college");
   assert.deepEqual(sent, [
     ["https://push.example/phone", "💰 Cashed: Home -3.5"],
     ["https://push.example/friend", "❌ Lost: Away ML"],

@@ -40,6 +40,7 @@ export function makePayload(bet, { name = "", includeStake = false, kind = "bet"
       p: l.pick,
       o: round(l.odds),
       g: l.gameId || undefined,
+      sp: l.sport && l.sport !== "cfb" ? l.sport : undefined,
       m: l.market || undefined,
       d: l.side || undefined,
       n: Number.isFinite(l.line) ? l.line : undefined,
@@ -88,6 +89,7 @@ export function sanitizeShare(raw) {
     if (!pick || !odds) return null;
     const leg = { pick, odds, status: STATUSES.has(l.s) ? l.s : "open" };
     if (typeof l.g === "string" && /^\d{1,14}$/.test(l.g)) leg.gameId = l.g;
+    if (leg.gameId) leg.sport = l.sp === "nfl" ? "nfl" : "cfb";
     if (MARKETS.has(l.m)) leg.market = l.m;
     if (SIDES.has(l.d)) leg.side = l.d;
     const line = num(l.n, -200, 400);

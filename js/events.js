@@ -12,7 +12,7 @@ import { parseSlipText } from "./slipparse.js";
 import * as cloud from "./cloud.js";
 import { load, uid } from "./store.js";
 import { CLOUD, acct, acctSubmit, paintAcct, syncNow } from "./account.js";
-import { refreshNews, refreshSchedule, refreshToday, tick } from "./data.js";
+import { refreshNews, refreshSchedule, refreshToday, switchSport, tick } from "./data.js";
 import { selByKey, setSim, slipCalc, slipLegFromSel, toggleSel, trackSlip } from "./market.js";
 import { openSheet, paintDock, render } from "./render.js";
 import { formCalc, newFormLeg, openAdd, paintForm, saveForm } from "./sheets/add.js";
@@ -319,7 +319,7 @@ export const actions = {
     const l = formLeg(el.dataset.id);
     if (!s || !l) return;
     const g = game(s.gameId);
-    Object.assign(l, { gameId: g.id, market: s.market, side: s.side, line: s.line, odds: s.odds, oddsText: formatOdds(s.odds, fmt()), gameLabel: g.shortName, kickoff: g.date });
+    Object.assign(l, { gameId: g.id, sport: g.sport, market: s.market, side: s.side, line: s.line, odds: s.odds, oddsText: formatOdds(s.odds, fmt()), gameLabel: g.shortName, kickoff: g.date });
     l.pick = legLabel(l, g);
     S.form.linking = null;
     S.form.linkGame = null;
@@ -329,7 +329,7 @@ export const actions = {
   "form-link-plain": (el) => {
     const l = formLeg(el.dataset.id);
     const g = game(S.form.linkGame);
-    Object.assign(l, { gameId: g.id, market: "other", gameLabel: g.shortName, kickoff: g.date });
+    Object.assign(l, { gameId: g.id, sport: g.sport, market: "other", gameLabel: g.shortName, kickoff: g.date });
     S.form.linking = null;
     S.form.linkGame = null;
     S.sheet.dirty = true;
@@ -338,7 +338,7 @@ export const actions = {
   },
   "form-unlink": (el) => {
     const l = formLeg(el.dataset.id);
-    for (const k of ["gameId", "market", "side", "line", "gameLabel", "kickoff"]) delete l[k];
+    for (const k of ["gameId", "sport", "market", "side", "line", "gameLabel", "kickoff"]) delete l[k];
     S.sheet.dirty = true;
     render();
   },
@@ -429,6 +429,7 @@ export const actions = {
     toast("Alerts are off on this device");
     paintAlerts();
   },
+  sport: (el) => switchSport(el.dataset.v),
   "widget-copy": async () => {
     const site = location.origin + location.pathname.replace(/[^/]*$/, "");
     const ok = await copy(installerCode(site));

@@ -49,7 +49,29 @@ const TEAMS = [
   [2641, "TTU", "Texas Tech", "Texas Tech Red Raiders", "cc0000", "000000", 80],
 ];
 
+// NFL: same shape. Ratings are only for making plausible lines.
+const NFL_TEAMS = [
+  [22, "ARI", "Cardinals", "Arizona Cardinals", "a40227", "ffffff", 74], [1, "ATL", "Falcons", "Atlanta Falcons", "a71930", "000000", 75],
+  [33, "BAL", "Ravens", "Baltimore Ravens", "29126f", "000000", 88], [2, "BUF", "Bills", "Buffalo Bills", "00338d", "d50a0a", 89],
+  [29, "CAR", "Panthers", "Carolina Panthers", "0085ca", "000000", 68], [3, "CHI", "Bears", "Chicago Bears", "0b1c3a", "e64100", 74],
+  [4, "CIN", "Bengals", "Cincinnati Bengals", "fb4f14", "000000", 80], [5, "CLE", "Browns", "Cleveland Browns", "472a08", "ff3c00", 69],
+  [6, "DAL", "Cowboys", "Dallas Cowboys", "002a5c", "b0b7bc", 77], [7, "DEN", "Broncos", "Denver Broncos", "0a2343", "fc4c02", 79],
+  [8, "DET", "Lions", "Detroit Lions", "0076b6", "bbbbbb", 88], [9, "GB", "Packers", "Green Bay Packers", "204e32", "ffb612", 83],
+  [34, "HOU", "Texans", "Houston Texans", "03202f", "a71930", 79], [11, "IND", "Colts", "Indianapolis Colts", "002c5f", "a2aaad", 74],
+  [30, "JAX", "Jaguars", "Jacksonville Jaguars", "007487", "d7a22a", 72], [12, "KC", "Chiefs", "Kansas City Chiefs", "e31837", "ffb612", 90],
+  [13, "LV", "Raiders", "Las Vegas Raiders", "000000", "a5acaf", 70], [24, "LAC", "Chargers", "Los Angeles Chargers", "0080c6", "ffc20e", 80],
+  [14, "LAR", "Rams", "Los Angeles Rams", "003594", "ffd100", 81], [15, "MIA", "Dolphins", "Miami Dolphins", "008e97", "fc4c02", 74],
+  [16, "MIN", "Vikings", "Minnesota Vikings", "4f2683", "ffc62f", 82], [17, "NE", "Patriots", "New England Patriots", "002a5c", "c60c30", 72],
+  [18, "NO", "Saints", "New Orleans Saints", "d3bc8d", "000000", 69], [19, "NYG", "Giants", "New York Giants", "003c7f", "c9243f", 68],
+  [20, "NYJ", "Jets", "New York Jets", "115740", "ffffff", 70], [21, "PHI", "Eagles", "Philadelphia Eagles", "06424d", "a5acaf", 89],
+  [23, "PIT", "Steelers", "Pittsburgh Steelers", "000000", "ffb612", 78], [25, "SF", "49ers", "San Francisco 49ers", "aa0000", "b3995d", 83],
+  [26, "SEA", "Seahawks", "Seattle Seahawks", "002a5c", "69be28", 77], [27, "TB", "Buccaneers", "Tampa Bay Buccaneers", "bd1c36", "3e3a35", 79],
+  [10, "TEN", "Titans", "Tennessee Titans", "4b92db", "002a5c", 67], [28, "WSH", "Commanders", "Washington Commanders", "5a1414", "ffb612", 81],
+];
+const teamsFor = (sport) => (sport === "nfl" ? NFL_TEAMS : TEAMS);
+
 const NETS = ["ABC", "ESPN", "FOX", "CBS", "NBC", "FS1", "ESPN2", "BTN", "SECN", "CW", "Peacock"];
+const NFL_NETS = ["CBS", "FOX", "CBS", "FOX", "NBC", "ESPN", "Prime Video", "NFL Network"];
 const T0 = Date.now();
 const SPEED = 6; // game minutes per real minute for today's games
 const GAME_MIN = 210; // wall-clock minutes a game "lasts" at 1x
@@ -67,12 +89,13 @@ const rankOf = (() => {
   return (id) => m.get(id) || 99;
 })();
 
-function slateFor(date) {
+function slateFor(date, sport = "cfb") {
   const day = date.getDay();
-  const count = day === 6 ? 16 : day === 5 ? 2 : day === 4 ? 1 : 0;
+  const nfl = sport === "nfl";
+  const count = nfl ? (day === 0 ? 14 : day === 1 || day === 4 ? 1 : 0) : day === 6 ? 16 : day === 5 ? 2 : day === 4 ? 1 : 0;
   if (!count) return [];
-  const r = rng(hash(ymd(date)));
-  const pool = [...TEAMS].sort(() => r() - 0.5);
+  const r = rng(hash(ymd(date) + (nfl ? "nfl" : "")));
+  const pool = [...teamsFor(sport)].sort(() => r() - 0.5);
   const today = ymd(date) === ymd(new Date());
   const games = [];
   for (let i = 0; i < count; i++) {
@@ -83,14 +106,14 @@ function slateFor(date) {
       const offsets = [-80, -55, -14, -9, -3, 25, 70, 140, 200, 260, 330, 400, -120, 95, 160, 300];
       kick = new Date(T0 + offsets[i % offsets.length] * 60000);
     } else {
-      const slots = day === 6 ? [10, 10, 13.5, 13.5, 14, 17, 17.5, 18, 19.5, 20, 21, 12, 15.5, 16, 19, 22.5] : [18, 20];
+      const slots = nfl ? (day === 0 ? [12, 12, 12, 12, 12, 12, 12, 15, 15, 15.4, 15.4, 15.4, 19.3, 12] : [19.25]) : day === 6 ? [10, 10, 13.5, 13.5, 14, 17, 17.5, 18, 19.5, 20, 21, 12, 15.5, 16, 19, 22.5] : [18, 20];
       const hour = slots[i % slots.length];
       kick = new Date(date);
       kick.setHours(Math.floor(hour), (hour % 1) * 60, 0, 0);
       // One game per week gets its kickoff moved two minutes after load, to show change tracking.
       if (i === 3 && Date.now() - T0 > 120000) kick = new Date(kick.getTime() + 150 * 60000);
     }
-    games.push({ id: `9${ymd(date)}${String(i).padStart(2, "0")}`, home, away, kick, seed: hash(ymd(date) + i), today, tbd: !today && i === count - 1 });
+    games.push({ id: `${nfl ? 8 : 9}${ymd(date)}${String(i).padStart(2, "0")}`, sport, home, away, kick, seed: hash(ymd(date) + i + sport), today, tbd: !nfl && !today && i === count - 1 });
   }
   return games;
 }
@@ -173,7 +196,7 @@ function eventFor(g) {
         date: g.kick.toISOString(),
         timeValid: !g.tbd,
         venue: { fullName: `${hshort} Stadium`, address: { city: "Somewhere", state: "USA" } },
-        broadcasts: [{ names: [NETS[g.seed % NETS.length]] }],
+        broadcasts: [{ names: [g.sport === "nfl" ? NFL_NETS[g.seed % NFL_NETS.length] : NETS[g.seed % NETS.length]] }],
         status: { displayClock: clock, period, type: { state, completed, detail: shortDetail, shortDetail } },
         situation:
           state === "in"
@@ -198,11 +221,11 @@ function eventFor(g) {
       homeAway,
       score: score == null ? undefined : String(score),
       winner,
-      curatedRank: { current: rankOf(id) },
+      curatedRank: { current: g.sport === "nfl" ? 99 : rankOf(id) },
       records: [{ type: "total", summary: `${3 + (id % 2)}-${id % 2}` }],
       team: {
         id: String(id), abbreviation: abbr, shortDisplayName: short, displayName: name, color, alternateColor: alt,
-        logo: `https://a.espncdn.com/i/teamlogos/ncaa/500/${id}.png`,
+        logo: g.sport === "nfl" ? `https://a.espncdn.com/i/teamlogos/nfl/500/${abbr.toLowerCase()}.png` : `https://a.espncdn.com/i/teamlogos/ncaa/500/${id}.png`,
       },
     };
   }
@@ -227,33 +250,36 @@ function parseDates(dates) {
   return [d(a), d(b || a)];
 }
 
-export async function fetchScoreboard(dates) {
+export async function fetchScoreboard(dates, { sport = "cfb" } = {}) {
   await new Promise((r) => setTimeout(r, 120));
   const [a, b] = parseDates(dates);
   const out = [];
-  for (let d = new Date(a); d <= b; d = addDays(d, 1)) out.push(...slateFor(d).map(eventFor).map(normalizeEvent));
+  for (let d = new Date(a); d <= b; d = addDays(d, 1)) out.push(...slateFor(d, sport).map(eventFor).map((ev) => normalizeEvent(ev, sport)));
   return out;
 }
 
-export async function fetchRange(start, days) {
-  return { games: await fetchScoreboard(`${ymd(start)}-${ymd(addDays(start, days - 1))}`), failedDays: [] };
+export async function fetchRange(start, days, opts) {
+  return { games: await fetchScoreboard(`${ymd(start)}-${ymd(addDays(start, days - 1))}`, opts), failedDays: [] };
 }
 
-export async function fetchNews() {
+export async function fetchNews({ sport = "cfb" } = {}) {
   await new Promise((r) => setTimeout(r, 150));
-  const r = rng(hash(ymd(new Date())));
-  const pick = () => TEAMS[Math.floor(r() * TEAMS.length)];
+  const r = rng(hash(ymd(new Date()) + sport));
+  const teams = teamsFor(sport);
+  const pick = () => teams[Math.floor(r() * teams.length)];
+  const nfl = sport === "nfl";
+  const day = nfl ? "Sunday" : "Saturday";
   const templates = [
-    (t) => [`${t[2]} QB listed as questionable with ankle injury ahead of Saturday`, `The starter was limited in practice Thursday; ${t[2]} will make a game-time decision.`],
+    (t) => [`${t[2]} QB listed as questionable with ankle injury ahead of ${day}`, `The starter was limited in practice Thursday; ${t[2]} will make a game-time decision.`],
     (t) => [`Line moves: Sharp money pushes ${t[2]} spread a full point`, `Books opened the number lower before early action came in on ${t[3]}.`],
     (t) => [`${t[2]} coach says 'we have to be better on third down' in press conference`, `Weekly press conference notes, injury updates and depth chart changes.`],
     (t) => [`Week 6 preview: key matchups and storylines for ${t[3]}`, `What to watch as conference play heats up, plus a look ahead at the next month.`],
-    (t) => [`AP Top 25 rankings: ${t[2]} climbs after statement win`, `Movement across the poll after a chaotic weekend.`],
-    (t) => [`${t[2]} lands commitment from four-star transfer portal receiver`, `The receiver chose ${t[2]} over several SEC programs.`],
+    nfl ? (t) => [`Power rankings: ${t[2]} climb after statement win`, `Movement across the league after a chaotic weekend.`] : (t) => [`AP Top 25 rankings: ${t[2]} climbs after statement win`, `Movement across the poll after a chaotic weekend.`],
+    nfl ? (t) => [`${t[3]} sign veteran receiver off the practice squad`, `The move adds depth after a hamstring injury.`] : (t) => [`${t[2]} lands commitment from four-star transfer portal receiver`, `The receiver chose ${t[2]} over several SEC programs.`],
     (t) => [`${t[2]} RB out for season after torn ACL`, `A major blow to ${t[3]}, who lean heavily on the run game.`],
-    (t) => [`Best bets for Saturday: upset alert on ${t[2]} as an underdog`, `Our analysts break down the spread, total and a moneyline parlay.`],
+    (t) => [`Best bets for ${day}: upset alert on ${t[2]} as an underdog`, `Our analysts break down the spread, total and a moneyline parlay.`],
     (t) => [`${t[2]} OC explains new tempo package in interview`, `The staff opens up on what changed during the bye week.`],
-    (t) => [`Playoff projection: where ${t[2]} stands at the quarter mark`, `CFP picture after five weeks.`],
+    (t) => [`Playoff projection: where ${t[2]} stand${nfl ? "" : "s"} at the quarter mark`, `${nfl ? "Playoff" : "CFP"} picture after five weeks.`],
   ];
   return Array.from({ length: 18 }, (_, i) => {
     const t = pick();

@@ -2,7 +2,7 @@
 
 import { esc, fmtDayLong, ago, statusText, icons, rankedBadge } from "../ui.js";
 import { chip, errorBox, lineSummary, myActionCount, scoreRows, skeleton, staleNote } from "../render.js";
-import { S, game } from "../state.js";
+import { S, SP, game } from "../state.js";
 
 // ── Live ──
 
@@ -17,13 +17,13 @@ export function viewLive() {
   const live = filtered.filter((g) => g.state === "in"), pre = filtered.filter((g) => g.state === "pre"), post = filtered.filter((g) => g.state === "post");
   const st = S.st.today;
   const head = `<div class="view-h">
-    <div><div class="eyebrow">Scoreboard</div><h1>${esc(fmtDayLong(new Date()))}</h1>
-      <p class="muted">${all.filter((g) => g.state === "in").length} live · ${all.length} FBS games · <span class="upd">${st.loading ? "updating…" : `updated <span data-ago="${st.at || 0}">${ago(st.at)}</span>`}</span></p></div>
+    <div><div class="eyebrow">${SP().label} scoreboard</div><h1>${esc(fmtDayLong(new Date()))}</h1>
+      <p class="muted">${all.filter((g) => g.state === "in").length} live · ${all.length} ${SP().games} · <span class="upd">${st.loading ? "updating…" : `updated <span data-ago="${st.at || 0}">${ago(st.at)}</span>`}</span></p></div>
     <button class="icon-btn" data-act="refresh" data-v="today" aria-label="Refresh">${icons.refresh}</button>
   </div>
-  <div class="chips">${chip("All", "live-f", "all", f === "all")}${chip(`<span class="dot live"></span>Live`, "live-f", "live", f === "live")}${chip("My action", "live-f", "mine", f === "mine")}${chip("Top 25", "live-f", "top25", f === "top25")}</div>`;
+  <div class="chips">${chip("All", "live-f", "all", f === "all")}${chip(`<span class="dot live"></span>Live`, "live-f", "live", f === "live")}${chip("My action", "live-f", "mine", f === "mine")}${SP().ranked ? chip("Top 25", "live-f", "top25", f === "top25") : ""}</div>`;
   if (st.error && !all.length) return head + errorBox("Couldn't reach the scoreboard", st.error, "today");
-  if (!all.length) return head + (st.at ? `<div class="empty">No FBS games today. Check <a href="#schedule" data-act="tab" data-v="schedule">Upcoming</a>.</div>` : skeleton(6));
+  if (!all.length) return head + (st.at ? `<div class="empty">No ${SP().games} today. Check <a href="#schedule" data-act="tab" data-v="schedule">Upcoming</a>.</div>` : skeleton(6));
   const sec = (title, gs) => (gs.length ? `<div class="sec-h"><h2>${title}</h2><span class="muted">${gs.length}</span></div><div class="grid-cards">${gs.map(liveCard).join("")}</div>` : "");
   return head + (st.error ? staleNote(st) : "") + sec(`<span class="dot live"></span>Live now`, live) + sec("Later today", pre) + sec("Final", post) + (filtered.length ? "" : `<div class="empty">Nothing matches that filter.</div>`);
 }

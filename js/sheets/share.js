@@ -22,7 +22,7 @@ function slipAsBet() {
     stake: S.slip.mode === "parlay" ? c.stake : 0,
     book: S.slip.book || "",
     oddsOverride: S.slip.mode === "parlay" && c.parlayOdds !== c.rawParlay ? c.parlayOdds : undefined,
-    legs: c.legs.map((l) => ({ id: l.id, pick: l.pick, odds: l.odds, status: "open", gameId: l.gameId, market: l.market, side: l.side, line: l.line, gameLabel: l.gameLabel, kickoff: l.kickoff })),
+    legs: c.legs.map((l) => ({ id: l.id, pick: l.pick, odds: l.odds, status: "open", gameId: l.gameId, sport: l.sport, market: l.market, side: l.side, line: l.line, gameLabel: l.gameLabel, kickoff: l.kickoff })),
   };
 }
 
@@ -245,7 +245,7 @@ export function sheetTail() {
 }
 
 function tailLegs(t) {
-  return t.legs.map((l) => ({ pick: l.pick, odds: l.odds, gameId: l.gameId, market: l.market, side: l.side, line: l.line, gameLabel: l.gameLabel, kickoff: l.kickoff }));
+  return t.legs.map((l) => ({ pick: l.pick, odds: l.odds, gameId: l.gameId, sport: l.sport, market: l.market, side: l.side, line: l.line, gameLabel: l.gameLabel, kickoff: l.kickoff }));
 }
 
 function tailIt() {

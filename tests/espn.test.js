@@ -62,3 +62,12 @@ test("win probability from moneyline, falling back to spread", async () => {
   assert.ok(bySpread.home > 0.7 && bySpread.home < 0.8);
   assert.equal(winProb({ odds: null }), null);
 });
+
+test("each league has its own ESPN feed, and games remember their league", async () => {
+  const { scoreboardUrl } = await import("../js/espn.js");
+  assert.equal(scoreboardUrl("20260926"), "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard?dates=20260926&groups=80&limit=500");
+  assert.equal(scoreboardUrl("20260927-20261003", "nfl"), "https://site.api.espn.com/apis/site/v2/sports/football/nfl/scoreboard?dates=20260927-20261003&limit=500");
+  const ev = { id: 7, competitions: [{ competitors: [comp("home", "12", "KC"), comp("away", "2", "BUF")] }] };
+  assert.equal(normalizeEvent(ev, "nfl").sport, "nfl");
+  assert.equal(normalizeEvent(ev).sport, "cfb");
+});

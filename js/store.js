@@ -38,4 +38,5 @@ export const DEFAULT_SETTINGS = {
   autoAccept: false,
   demo: false,
   top25Only: false,
+  sport: "cfb",
 };

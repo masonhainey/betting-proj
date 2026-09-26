@@ -172,7 +172,7 @@ export function saveForm() {
     stake: Math.round(c.stake * 100) / 100,
     book: f.book.trim(),
     note: f.note.trim(),
-    legs: legs.map((l) => ({ id: uid(), pick: l.pick.trim(), odds: l.odds, status: "open", gameId: l.gameId, market: l.market, side: l.side, line: l.line, gameLabel: l.gameLabel, kickoff: l.kickoff })),
+    legs: legs.map((l) => ({ id: uid(), pick: l.pick.trim(), odds: l.odds, status: "open", gameId: l.gameId, market: l.market, side: l.side, line: l.line, gameLabel: l.gameLabel, kickoff: l.kickoff, sport: l.sport })),
   };
   relinkLegs([bet], [...S.games.values()]); // typed picks like "UCLA +3.5" get their game, so they settle themselves
   if (f.ghost) bet.ghost = true;

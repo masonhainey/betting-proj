@@ -116,11 +116,21 @@ input::placeholder, textarea::placeholder { color: var(--faint); }
 .brand svg { width: 38px; height: 26px; }
 .brand svg path { fill: var(--accent); stroke: none; }
 .today-top { color: var(--muted); font-size: 14px; font-weight: 500; }
-.cfb-tag { display: inline-flex; align-items: center; gap: 7px; color: var(--accent); font-weight: 800; font-size: 13px; letter-spacing: 0.04em; text-transform: uppercase; }
-.cfb-tag::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
-.today-top, .cfb-tag { white-space: nowrap; }
+.sport-seg { display: inline-flex; padding: 3px; gap: 2px; border-radius: 999px; background: var(--card); border: 1px solid var(--line); flex: none; }
+.sport-seg button { border: 0; background: none; color: var(--muted); font: inherit; font-size: 12px; font-weight: 800; letter-spacing: 0.05em; padding: 5px 11px; border-radius: 999px; cursor: pointer; transition: background 0.15s, color 0.15s; }
+.sport-seg button:hover { color: var(--text); }
+.sport-seg button.on { background: var(--accent); color: var(--accent-ink); }
+.today-top { white-space: nowrap; }
 @media (max-width: 1480px) { .today-top { display: none; } }
-@media (max-width: 1240px) { .cfb-tag { display: none; } }
+@media (max-width: 480px) {
+  .top { gap: 10px; }
+  .top-r { gap: 8px; }
+  .brand { font-size: 22px; gap: 7px; }
+  .brand svg { width: 31px; height: 21px; }
+  .sport-seg button { padding: 5px 9px; font-size: 11.5px; }
+  .demo-flag { font-size: 9px; padding: 2px 5px; }
+}
+@media (max-width: 360px) { .brand span:not(.demo-flag) { display: none; } }
 .demo-flag { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; padding: 3px 7px; border-radius: 6px; background: var(--amber-soft); color: var(--amber); }
 .nav { display: flex; gap: 4px; margin-left: 12px; }
 .nav a {

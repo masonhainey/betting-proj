@@ -32,7 +32,17 @@ var SUPABASE_URL = "https://vcmgdhmhizyqjnyjxmcl.supabase.co";
 var SUPABASE_ANON_KEY = "sb_publishable_uKY0eEvFEDrBlD_jpOzEPA_MAb1PSLw";
 
 // js/espn.js
+var ROOT = "https://site.api.espn.com/apis/site/v2/sports/football";
+var SPORTS = {
+  cfb: { key: "cfb", path: "college-football", groups: "80", label: "CFB", name: "College football", games: "FBS games", ranked: true, logos: "ncaa" },
+  nfl: { key: "nfl", path: "nfl", groups: null, label: "NFL", name: "NFL", games: "NFL games", ranked: false, logos: "nfl" }
+};
+var sportOf = (k) => SPORTS[k] || SPORTS.cfb;
 var etDay = (d) => new Intl.DateTimeFormat("en-CA", { timeZone: "America/New_York", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date(d)).replaceAll("-", "");
+function scoreboardUrl(dates, sport = "cfb") {
+  const sp = sportOf(sport);
+  return `${ROOT}/${sp.path}/scoreboard?dates=${dates}${sp.groups ? `&groups=${sp.groups}` : ""}&limit=500`;
+}
 var num = (v) => {
   if (v == null || v === "") return null;
   if (typeof v === "string" && /^(ev|even)$/i.test(v.trim())) return 100;
@@ -85,7 +95,7 @@ function normalizeOdds(o, home, away) {
   }
   return out.ml || out.spread || out.total ? out : null;
 }
-function normalizeEvent(ev) {
+function normalizeEvent(ev, sport = "cfb") {
   const comp = ev?.competitions?.[0];
   if (!comp) return null;
   const home = team(comp.competitors?.find((c) => c.homeAway === "home"));
@@ -96,6 +106,7 @@ function normalizeEvent(ev) {
   const sit = comp.situation;
   return {
     id: String(ev.id),
+    sport,
     date: comp.date || ev.date,
     timeValid: comp.timeValid !== false,
     name: ev.name,
@@ -250,16 +261,21 @@ var LOOKAHEAD_DAYS = 8;
 var inPlay = (bets) => bets.filter((b) => !b.ghost && Array.isArray(b.legs) && b.legs.length);
 function daysToFetch(bets, now = /* @__PURE__ */ new Date()) {
   const t = now.getTime();
-  const days = /* @__PURE__ */ new Set([etDay(t)]);
+  const days = /* @__PURE__ */ new Set();
+  const leagues = /* @__PURE__ */ new Set();
   for (const b of inPlay(bets)) {
     if (betStatus(b) !== "open") continue;
     for (const l of b.legs) {
       const k = Date.parse(l.kickoff);
       if (l.status !== "open" || !l.gameId || !Number.isFinite(k)) continue;
-      if (k >= t - LOOKBACK_DAYS * 864e5 && k <= t + LOOKAHEAD_DAYS * 864e5) days.add(etDay(k));
+      const sp = l.sport === "nfl" ? "nfl" : "cfb";
+      leagues.add(sp);
+      if (k >= t - LOOKBACK_DAYS * 864e5 && k <= t + LOOKAHEAD_DAYS * 864e5) days.add(`${sp}|${etDay(k)}`);
     }
   }
-  return [...days].sort().slice(0, 6);
+  if (!leagues.size) leagues.add("cfb");
+  for (const sp of leagues) days.add(`${sp}|${etDay(t)}`);
+  return [...days].sort((a, b) => a.slice(-8).localeCompare(b.slice(-8)) || a.localeCompare(b)).slice(0, 8);
 }
 function kickText(date, now = /* @__PURE__ */ new Date()) {
   const d = new Date(date);
@@ -371,7 +387,6 @@ function buildModel(bets, games, now = /* @__PURE__ */ new Date()) {
 }
 
 // widget/src/core.js
-var ESPN = "https://site.api.espn.com/apis/site/v2/sports/football/college-football/scoreboard";
 var KEY = { email: "hedgehog.email", password: "hedgehog.password", session: "hedgehog.session" };
 var C = {
   bg1: "#1a1330",
@@ -444,11 +459,12 @@ async function loadBets(access) {
 async function loadGames(days) {
   const games = /* @__PURE__ */ new Map();
   await Promise.all(
-    days.map(async (d) => {
+    days.map(async (key) => {
+      const [sport, d] = key.split("|");
       try {
-        const data = await http(`${ESPN}?dates=${d}&groups=80&limit=500`);
+        const data = await http(scoreboardUrl(d, sport));
         for (const ev of data?.events || []) {
-          const g = normalizeEvent(ev);
+          const g = normalizeEvent(ev, sport);
           if (g) games.set(g.id, g);
         }
       } catch {

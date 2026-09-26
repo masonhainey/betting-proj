@@ -64,7 +64,10 @@ test("widget refresh timing: 5 min live, next kickoff otherwise, hourly at most"
 
 test("scoreboard days: today plus open legs' days (Eastern), nothing stale", () => {
   const future = { id: "f", stake: 5, legs: [{ ...leg("f1", "9", "ml", "home"), kickoff: "2026-10-04T01:00:00Z" }] }; // Oct 3, 9 PM ET
-  assert.deepEqual(daysToFetch([...bets, future], now), ["20260926", "20261003"]);
+  assert.deepEqual(daysToFetch([...bets, future], now), ["cfb|20260926", "cfb|20261003"]);
+  const nfl = { id: "n", stake: 5, legs: [{ ...leg("n1", "9", "ml", "home"), sport: "nfl", kickoff: "2026-09-27T17:00:00Z" }] };
+  assert.deepEqual(daysToFetch([bets[0], nfl], now), ["cfb|20260926", "nfl|20260926", "nfl|20260927"], "both leagues, each day once");
+  assert.deepEqual(daysToFetch([], now), ["cfb|20260926"]);
 });
 
 // ── the real bundle, run against a stand-in for Scriptable ──

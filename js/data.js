@@ -12,12 +12,14 @@ import { dayKey, startOfDay } from "./ui.js";
 import { CLOUD, acct, syncNow } from "./account.js";
 import { detectMoves } from "./market.js";
 import { paintAgo, paintStatus, render } from "./render.js";
-import { NS, S, game, saveBets, settings, src, toast } from "./state.js";
+import { NS, S, game, saveBets, saveSettings, settings, sport, src, toast } from "./state.js";
 
 // ───────────────────────────── data ─────────────────────────────
 
+const cacheKey = () => NS + (sport() === "cfb" ? "cache" : `cache.${sport()}`);
+
 export function loadCache() {
-  const c = load(NS + "cache", null);
+  const c = load(cacheKey(), null);
   if (!c?.games) return;
   const tomorrow = addDays(startOfDay(), 1);
   const today = dayKey(new Date());
@@ -29,7 +31,7 @@ export function loadCache() {
 
 export function saveCache() {
   const ids = new Set([...S.scheduleIds, ...S.todayIds]);
-  save(NS + "cache", { at: S.st.schedule.at || Date.now(), games: [...ids].map(game).filter(Boolean) });
+  save(cacheKey(), { at: S.st.schedule.at || Date.now(), games: [...ids].map(game).filter(Boolean) });
 }
 
 export function merge(games) {
@@ -93,9 +95,11 @@ export async function refreshToday() {
   const st = S.st.today;
   st.loading = true;
   paintStatus();
+  const sp = sport();
   try {
-    const games = await src().fetchScoreboard(ymd(new Date()));
+    const games = await src().fetchScoreboard(ymd(new Date()), { sport: sp });
     merge(games);
+    if (sp !== sport()) return; // switched leagues mid-request
     S.todayIds = games.map((g) => g.id);
     st.at = Date.now();
     st.error = null;
@@ -112,10 +116,12 @@ export async function refreshSchedule() {
   const st = S.st.schedule;
   st.loading = true;
   paintStatus();
+  const sp = sport();
   try {
     const start = addDays(startOfDay(), 1);
-    const { games, failedDays } = await src().fetchRange(start, 28);
+    const { games, failedDays } = await src().fetchRange(start, 28, { sport: sp });
     merge(games);
+    if (sp !== sport()) return;
     const tomorrow = start.getTime();
     // Keep previously-loaded games for any day that failed this round.
     const failed = new Set(failedDays.map((d) => `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}`));
@@ -138,6 +144,7 @@ export async function refreshSchedule() {
  * late games ESPN files under yesterday's date, and days an unlinked pick might be on.
  */
 const looked = new Set(); // days already searched for unlinked picks this session
+const legSport = (l) => l.sport || game(l.gameId)?.sport || "cfb";
 export async function refreshBetGames() {
   const st = S.st.betGames;
   const now = Date.now();
@@ -150,20 +157,26 @@ export async function refreshBetGames() {
       if (l.gameId && l.kickoff) {
         const g = game(l.gameId);
         const t = Date.parse(g?.date || l.kickoff);
-        if (t <= now && now - t < 14 * 864e5 && g?.state !== "post" && !today.has(l.gameId)) days.add(etDay(t));
+        if (t <= now && now - t < 14 * 864e5 && g?.state !== "post" && !today.has(l.gameId)) days.add(`${legSport(l)}|${etDay(t)}`);
       } else if (needsLink(l)) {
-        // Look through the days from when it was placed up to yesterday (today and later are loaded anyway).
+        // Look through the days from when it was placed up to yesterday, in both leagues
+        // (today and later are loaded anyway for the league on screen).
         const placed = Date.parse(b.createdAt) || now;
         for (let t = Math.max(placed - 864e5, now - 7 * 864e5); t < now - 864e5 / 2; t += 864e5) {
-          const d = etDay(t);
-          if (!looked.has(d)) days.add(d), looked.add(d);
+          for (const sp of ["cfb", "nfl"]) {
+            const d = `${sp}|${etDay(t)}`;
+            if (!looked.has(d)) days.add(d), looked.add(d);
+          }
         }
       }
     }
   }
   if (!days.size) return;
   st.loading = true;
-  const res = await Promise.allSettled([...days].map((d) => src().fetchScoreboard(d)));
+  const res = await Promise.allSettled([...days].map((k) => {
+    const [sp, d] = k.split("|");
+    return src().fetchScoreboard(d, { sport: sp });
+  }));
   for (const r of res) if (r.status === "fulfilled") merge(r.value);
   st.at = Date.now();
   st.loading = false;
@@ -174,8 +187,11 @@ export async function refreshNews() {
   const st = S.st.news;
   st.loading = true;
   paintStatus();
+  const sp = sport();
   try {
-    S.news = (await src().fetchNews()).map((a) => ({ ...a, tags: tagArticle(a) }));
+    const news = (await src().fetchNews({ sport: sp })).map((a) => ({ ...a, tags: tagArticle(a) }));
+    if (sp !== sport()) return;
+    S.news = news;
     st.at = Date.now();
     st.error = null;
   } catch (e) {
@@ -183,6 +199,23 @@ export async function refreshNews() {
   }
   st.loading = false;
   render();
+}
+
+/** Switch the game views between leagues. Your bets, stats and friends stay as they are. */
+export function switchSport(k) {
+  if (k === sport()) return;
+  settings.sport = k;
+  saveSettings();
+  S.todayIds = [];
+  S.scheduleIds = [];
+  S.news = [];
+  S.st.today = {};
+  S.st.schedule = {};
+  S.st.news = {};
+  if (S.f.live === "top25") S.f.live = "all";
+  loadCache();
+  render();
+  tick(true);
 }
 
 /** You have an open leg on a game that's live or about to start. */
@@ -203,6 +236,7 @@ export function tick(force) {
     if (!st.loading && (!st.tried || now - st.tried >= (settings.demo ? 8000 : 60000))) {
       st.tried = now;
       refreshToday();
+      if (!S.st.betGames.loading) refreshBetGames(); // your games in the other league
     }
     return;
   }
@@ -219,7 +253,7 @@ export function tick(force) {
   };
   due("today", hot ? (settings.demo ? 8000 : 20000) : 120000, refreshToday);
   due("schedule", 600000, refreshSchedule);
-  due("betGames", 90000, refreshBetGames);
+  due("betGames", liveAction(now) ? 30000 : 90000, refreshBetGames);
   due("news", 600000, refreshNews);
   paintAgo();
   if (CLOUD && cloud.currentUser() && !document.hidden && Date.now() - Math.max(acct.lastSync, acct.lastTry || 0) > 30000) syncNow();

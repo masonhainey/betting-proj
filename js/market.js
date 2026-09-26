@@ -113,7 +113,7 @@ export function setSim(on) {
 
 export function slipLegFromSel(s) {
   const g = game(s.gameId);
-  const leg = { id: uid(), key: s.key, gameId: s.gameId, market: s.market, side: s.side, line: s.line, odds: s.odds, marketOdds: s.odds, status: "open" };
+  const leg = { id: uid(), key: s.key, sport: g?.sport, gameId: s.gameId, market: s.market, side: s.side, line: s.line, odds: s.odds, marketOdds: s.odds, status: "open" };
   leg.pick = legLabel(leg, g);
   leg.gameLabel = g.shortName;
   leg.kickoff = g.date;
@@ -176,7 +176,7 @@ export function trackSlip() {
   const book = S.slip.book?.trim() || "";
   const now = new Date().toISOString();
   const ghost = S.slip.ghost ? { ghost: true } : {};
-  const mkLeg = (l) => ({ id: uid(), pick: l.pick, odds: l.odds, status: "open", gameId: l.gameId, market: l.market, side: l.side, line: l.line, gameLabel: l.gameLabel, kickoff: l.kickoff });
+  const mkLeg = (l) => ({ id: uid(), pick: l.pick, odds: l.odds, status: "open", gameId: l.gameId, market: l.market, side: l.side, line: l.line, gameLabel: l.gameLabel, kickoff: l.kickoff, sport: l.sport });
   let added = 0;
   const unnamed = c.legs.find((l) => l.custom && !l.pick.trim());
   if (unnamed) return toast("Give your custom selection a name", "err");

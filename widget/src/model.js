@@ -14,19 +14,27 @@ export { etDay };
 /** Real (not ghost) bets that still have a leg in play, plus ones that may have settled today. */
 const inPlay = (bets) => bets.filter((b) => !b.ghost && Array.isArray(b.legs) && b.legs.length);
 
-/** Scoreboard dates to fetch: today plus the days of recent and upcoming open legs. */
+/**
+ * Scoreboards to fetch, as "league|day" keys ("nfl|20260927"): today plus the days of recent
+ * and upcoming open legs, for each league you have action in.
+ */
 export function daysToFetch(bets, now = new Date()) {
   const t = now.getTime();
-  const days = new Set([etDay(t)]);
+  const days = new Set();
+  const leagues = new Set();
   for (const b of inPlay(bets)) {
     if (betStatus(b) !== "open") continue;
     for (const l of b.legs) {
       const k = Date.parse(l.kickoff);
       if (l.status !== "open" || !l.gameId || !Number.isFinite(k)) continue;
-      if (k >= t - LOOKBACK_DAYS * 864e5 && k <= t + LOOKAHEAD_DAYS * 864e5) days.add(etDay(k));
+      const sp = l.sport === "nfl" ? "nfl" : "cfb";
+      leagues.add(sp);
+      if (k >= t - LOOKBACK_DAYS * 864e5 && k <= t + LOOKAHEAD_DAYS * 864e5) days.add(`${sp}|${etDay(k)}`);
     }
   }
-  return [...days].sort().slice(0, 6);
+  if (!leagues.size) leagues.add("cfb");
+  for (const sp of leagues) days.add(`${sp}|${etDay(t)}`);
+  return [...days].sort((a, b) => a.slice(-8).localeCompare(b.slice(-8)) || a.localeCompare(b)).slice(0, 8);
 }
 
 /** Kickoff time the way a widget has room for: "3:30 PM" today, "Sat 3:30 PM" otherwise. */
