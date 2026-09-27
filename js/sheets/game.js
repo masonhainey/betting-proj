@@ -6,6 +6,7 @@ import { esc, fmtDay, fmtDayTime, ago, logo, statusText, icons, rankedBadge } fr
 import { markets } from "../market.js";
 import { closeBtn, kickBadge, lineSummary, scoreRows, selBtn } from "../render.js";
 import { S, game } from "../state.js";
+import { fieldCaption, fieldGraphic } from "../fieldview.js";
 import { betCard } from "../views/bets.js";
 import { fmtA, newsCard, spreadTxt } from "../views/news.js";
 
@@ -25,6 +26,7 @@ export function sheetGame() {
     <div class="gsheet-top ${g.state}">
       <div class="gs-status">${g.state === "in" ? `<span class="dot live"></span>` : ""}${esc(g.state === "pre" ? (g.timeValid ? fmtDayTime(g.date) : `${fmtDay(g.date)} · TBD`) : g.detail || statusText(g))}</div>
       <div class="teams lg">${scoreRows(g, { big: true })}</div>
+      ${fieldGraphic(g, "lg")}${fieldCaption(g)}
       <div class="gs-meta">${[g.tv, g.venue, g.city, g.notes].filter(Boolean).map(esc).join(" · ")}</div>
       <div class="stags">${rankedBadge(g)}${kickBadge(g)}</div>
       ${g.state === "in" && g.situation?.lastPlay ? `<div class="lp">${esc(g.situation.lastPlay)}</div>` : ""}

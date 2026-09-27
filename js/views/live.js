@@ -3,6 +3,7 @@
 import { esc, fmtDayLong, ago, statusText, icons, rankedBadge } from "../ui.js";
 import { chip, errorBox, lineSummary, myActionCount, scoreRows, skeleton, staleNote } from "../render.js";
 import { S, SP, game } from "../state.js";
+import { fieldGraphic } from "../fieldview.js";
 
 // ── Live ──
 
@@ -34,6 +35,7 @@ export function liveCard(g) {
   return `<article class="gcard ${g.state} ${sit?.redZone ? "rz" : ""} ${mine ? "mine" : ""}" data-act="open-game" data-id="${g.id}" tabindex="0">
     <header><span class="gstatus">${g.state === "in" ? `<span class="dot live"></span>` : ""}${esc(statusText(g))}</span>${g.tv ? `<span class="tv">${esc(g.tv)}</span>` : ""}<span class="grow"></span>${rankedBadge(g, true)}${mine ? `<span class="badge mine">${mine} bet${mine > 1 ? "s" : ""}</span>` : ""}</header>
     <div class="teams">${scoreRows(g)}</div>
+    ${fieldGraphic(g)}
     ${sit ? `<div class="sit">${sit.redZone ? `<span class="badge rz">Red zone</span>` : ""}${sit.downDistance ? `<span>${esc(sit.downDistance)}</span>` : ""}${sit.lastPlay ? `<span class="lp">${esc(sit.lastPlay)}</span>` : ""}</div>` : ""}
     ${g.odds && g.state !== "post" ? `<footer class="muted">${lineSummary(g)}</footer>` : ""}
   </article>`;

@@ -195,6 +195,15 @@ export function normalizeEvent(ev, sport = "cfb") {
           downDistance: sit.shortDownDistanceText || sit.downDistanceText || "",
           redZone: !!sit.isRedZone,
           lastPlay: sit.lastPlay?.text || "",
+          // For the field graphic: where the ball is and what's needed.
+          spotText: sit.possessionText || (/ at (.+)$/.exec(sit.downDistanceText || "")?.[1] ?? ""),
+          down: num(sit.down),
+          distance: num(sit.distance),
+          toEndzone: num(sit.yardsToEndzone),
+          lastPlayType: sit.lastPlay?.type?.text || "",
+          lastPlayTeam: sit.lastPlay?.team?.id ? String(sit.lastPlay.team.id) : null,
+          homeTimeouts: num(sit.homeTimeouts),
+          awayTimeouts: num(sit.awayTimeouts),
         }
       : null,
     odds: normalizeOdds(comp.odds?.[0], home, away),

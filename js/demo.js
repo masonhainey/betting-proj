@@ -184,7 +184,6 @@ function eventFor(g) {
   const shortDetail =
     state === "pre" ? g.kick.toLocaleString("en-US", { month: "numeric", day: "numeric", hour: "numeric", minute: "2-digit" }) :
     state === "post" ? "Final" : `${clock} - ${["1st", "2nd", "3rd", "4th"][period - 1]}`;
-  const poss = r() < 0.5 ? hid : aid;
   return {
     id: g.id,
     date: g.kick.toISOString(),
@@ -198,15 +197,7 @@ function eventFor(g) {
         venue: { fullName: `${hshort} Stadium`, address: { city: "Somewhere", state: "USA" } },
         broadcasts: [{ names: [g.sport === "nfl" ? NFL_NETS[g.seed % NFL_NETS.length] : NETS[g.seed % NETS.length]] }],
         status: { displayClock: clock, period, type: { state, completed, detail: shortDetail, shortDetail } },
-        situation:
-          state === "in"
-            ? {
-                possession: String(poss),
-                shortDownDistanceText: `${1 + (g.seed % 3)}${["st", "nd", "rd"][g.seed % 3]} & ${3 + (g.seed % 8)}`,
-                isRedZone: (Math.floor(now / 30000) + g.seed) % 5 === 0,
-                lastPlay: { text: "Demo play-by-play: 9-yard run up the middle." },
-              }
-            : undefined,
+        situation: state === "in" ? drive(g, gameMin, hid, aid, habbr, aabbr) : undefined,
         competitors: [
           comp("home", g.home, hs, state === "post" && hs > as),
           comp("away", g.away, as, state === "post" && as > hs),
@@ -229,6 +220,48 @@ function eventFor(g) {
       },
     };
   }
+}
+
+/**
+ * A simulated drive so the field graphic has something to show: each possession starts
+ * around the 25 and moves downfield play by play, ending in a score or a punt.
+ */
+function drive(g, gameMin, hid, aid, habbr, aabbr) {
+  const LEN = 3.2; // game minutes per possession
+  const n = Math.floor(gameMin / LEN);
+  const frac = (gameMin % LEN) / LEN;
+  const r = rng(g.seed + n * 7919);
+  const homeBall = (n + g.seed) % 2 === 0;
+  const reach = 45 + r() * 60; // how far this drive gets before it ends
+  const plays = Math.floor(frac * 9); // one play per ~20s of game time
+  let own = 25; // yards from the offense's own goal line
+  let down = 1, togo = 10, last = "Kickoff: touchback.", lastType = "Kickoff";
+  for (let p = 0; p < plays; p++) {
+    const gain = Math.round(-2 + r() * 14);
+    own = Math.min(99, reach, Math.max(1, own + gain)); // the drive stalls at `reach` (or scores)
+    last = gain >= 0 ? `${gain}-yard ${r() < 0.5 ? "run" : "pass"}` : `Sacked for a loss of ${-gain}`;
+    lastType = gain >= 0 ? "Rush" : "Sack";
+    togo -= gain;
+    if (togo <= 0) { down = 1; togo = 10; last += ", first down"; }
+    else if (++down > 4) { down = 1; togo = 10; }
+  }
+  const scored = own >= 99;
+  if (scored) { last = "Touchdown! 3-yard run up the middle."; lastType = "Rushing Touchdown"; }
+  const opp = homeBall ? aabbr : habbr, mine = homeBall ? habbr : aabbr;
+  const yd = Math.round(own);
+  const spot = yd === 50 ? "50" : yd < 50 ? `${mine} ${yd}` : `${opp} ${100 - yd}`;
+  const goal = togo >= 100 - yd;
+  const ord = ["1st", "2nd", "3rd", "4th"][down - 1];
+  return {
+    possession: String(homeBall ? hid : aid),
+    down, distance: togo, yardLine: yd, yardsToEndzone: 100 - yd,
+    possessionText: spot,
+    shortDownDistanceText: `${ord} & ${goal ? "Goal" : togo}`,
+    downDistanceText: `${ord} & ${goal ? "Goal" : togo} at ${spot}`,
+    isRedZone: 100 - yd <= 20,
+    homeTimeouts: 3 - (g.seed % 2), awayTimeouts: 3 - ((g.seed >> 1) % 3),
+    lastPlay: { text: `Demo: ${last}`, type: { text: lastType }, team: { id: String(homeBall ? hid : aid) } },
+  };
 }
 
 const fmtA = (n) => (n > 0 ? `+${n}` : `${n}`);

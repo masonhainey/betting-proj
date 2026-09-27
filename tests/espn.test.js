@@ -81,3 +81,11 @@ test("team logos: ESPN's when sent, otherwise the right league's", async () => {
   const cfb = normalizeEvent({ id: 9, competitions: [{ competitors: [comp("home", "333", "ALA"), comp("away", "61", "UGA")] }] });
   assert.match(logoUrl(cfb.home), /teamlogos\/ncaa\/500(-dark)?\/333\.png$/);
 });
+
+test("keeps what the field graphic needs from the live situation", () => {
+  const g = normalizeEvent({ id: 5, competitions: [{ status: { type: { state: "in" } }, competitors: [comp("home", "12", "KC", "7"), comp("away", "2", "BUF", "3")],
+    situation: { possession: "2", down: 2, distance: 7, yardsToEndzone: 65, possessionText: "BUF 35", downDistanceText: "2nd & 7 at BUF 35", homeTimeouts: 3, awayTimeouts: 2, lastPlay: { text: "Allen pass for 8", type: { text: "Pass Reception" }, team: { id: "2" } } } }] }, "nfl");
+  assert.deepEqual([g.situation.spotText, g.situation.down, g.situation.distance, g.situation.toEndzone, g.situation.lastPlayTeam, g.situation.awayTimeouts], ["BUF 35", 2, 7, 65, "2", 2]);
+  const g2 = normalizeEvent({ id: 6, competitions: [{ competitors: [comp("home", "12", "KC"), comp("away", "2", "BUF")], situation: { possession: "12", downDistanceText: "1st & 10 at KC 25" } }] });
+  assert.equal(g2.situation.spotText, "KC 25", "spot read from the down & distance text when possessionText is missing");
+});
