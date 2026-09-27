@@ -20,8 +20,10 @@ export function parseSpot(text) {
  */
 export function fieldState(g) {
   const s = g?.state === "in" ? g.situation : null;
-  if (!s?.possession) return null;
-  const offense = [g.home, g.away].find((t) => t.id === s.possession);
+  // Between plays ESPN sometimes drops `possession`; the team on the last play is next best.
+  const poss = s?.possession || s?.lastPlayTeam;
+  if (!poss) return null;
+  const offense = [g.home, g.away].find((t) => t.id === poss);
   if (!offense) return null;
   const isHome = offense === g.home;
   const defense = isHome ? g.away : g.home;

@@ -89,3 +89,17 @@ test("keeps what the field graphic needs from the live situation", () => {
   const g2 = normalizeEvent({ id: 6, competitions: [{ competitors: [comp("home", "12", "KC"), comp("away", "2", "BUF")], situation: { possession: "12", downDistanceText: "1st & 10 at KC 25" } }] });
   assert.equal(g2.situation.spotText, "KC 25", "spot read from the down & distance text when possessionText is missing");
 });
+
+test("TBD kickoffs land on the right day in every US timezone", async () => {
+  const { kickoff } = await import("../js/espn.js");
+  // ESPN's TBD placeholder: midnight Eastern on Saturday Oct 3 (= Friday night in Central).
+  const k = kickoff("2026-10-03T04:00Z", false);
+  assert.equal(k.timeValid, false);
+  assert.equal(k.date, "2026-10-03T17:00:00Z");
+  for (const tz of ["America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "Pacific/Honolulu"]) {
+    assert.equal(new Date(k.date).toLocaleDateString("en-US", { timeZone: tz, weekday: "short" }), "Sat", tz);
+  }
+  assert.equal(kickoff("2026-10-03T04:00Z", undefined).timeValid, false, "midnight ET is a placeholder even if not flagged");
+  assert.deepEqual(kickoff("2026-10-03T23:30Z", undefined), { date: "2026-10-03T23:30Z", timeValid: true }, "real times untouched");
+  assert.deepEqual(kickoff("2026-10-03T00:30Z", true), { date: "2026-10-03T00:30Z", timeValid: true }, "Friday 8:30 PM ET stays Friday");
+});

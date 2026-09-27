@@ -248,6 +248,29 @@ export async function refreshBoxes() {
   afterData();
 }
 
+/** Drive, plays and win probability for the game page you have open (live games only). */
+const detailAt = {};
+export async function refreshDetail(force = false) {
+  const id = S.sheet?.kind === "game" ? S.sheet.id : null;
+  const g = id && game(id);
+  if (!g || g.state === "pre") return;
+  if (g.state === "post" && S.detail[id]?.final) return;
+  const every = settings.demo ? 6000 : 15000;
+  if (!force && Date.now() - (detailAt[id] || 0) < every) return;
+  detailAt[id] = Date.now();
+  try {
+    const s = await src().fetchSummary(id, { sport: g.sport || "cfb" });
+    S.detail[id] = { drive: s.drive, winProb: s.winProb, at: Date.now(), final: s.box.final };
+    if (s.box.players.length) {
+      S.box[id] = s.box;
+      g.box = s.box;
+    }
+  } catch {
+    return;
+  }
+  if (S.sheet?.id === id) render();
+}
+
 export async function refreshNews() {
   const st = S.st.news;
   st.loading = true;
@@ -322,6 +345,7 @@ export function tick(force) {
   due("betGames", liveAction(now) ? 30000 : 90000, refreshBetGames);
   due("news", 600000, refreshNews);
   due("boxes", settings.demo ? 8000 : 30000, refreshBoxes);
+  refreshDetail();
   paintAgo();
   if (CLOUD && cloud.currentUser() && !document.hidden && Date.now() - Math.max(acct.lastSync, acct.lastTry || 0) > 30000) syncNow();
 }

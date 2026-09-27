@@ -4,7 +4,7 @@
 // scores tick, bets swing and auto-grade in a single sitting.
 
 import { normalizeEvent, addDays, ymd } from "./espn.js";
-import { parseBox } from "./props.js";
+import { parseSummary } from "./summary.js";
 
 const TEAMS = [
   // id, abbr, short, full, color, alt, rating
@@ -129,10 +129,11 @@ function scoringPlays(seed, hr, ar) {
   return plays;
 }
 
+const gameMinOf = (g) => ((Date.now() - g.kick.getTime()) / 60000) * (g.today ? SPEED : 1) * (60 / GAME_MIN);
+
 function eventFor(g) {
   const now = Date.now();
-  const speed = g.today ? SPEED : 1;
-  const gameMin = ((now - g.kick.getTime()) / 60000) * speed * (60 / GAME_MIN);
+  const gameMin = gameMinOf(g);
   let state = "pre", completed = false, period = 0, clock = "0:00";
   let hs = null, as = null;
   const [hid, habbr, hshort, hname, _hcol, _halt, hr] = g.home;
@@ -237,6 +238,7 @@ function drive(g, gameMin, hid, aid, habbr, aabbr) {
   const plays = Math.floor(frac * 9); // one play per ~20s of game time
   let own = 25; // yards from the offense's own goal line
   let down = 1, togo = 10, last = "Kickoff: touchback.", lastType = "Kickoff";
+  const log = [{ text: "Kickoff: touchback.", type: "Kickoff", yards: 0 }];
   for (let p = 0; p < plays; p++) {
     const gain = Math.round(-2 + r() * 14);
     own = Math.min(99, reach, Math.max(1, own + gain)); // the drive stalls at `reach` (or scores)
@@ -245,9 +247,10 @@ function drive(g, gameMin, hid, aid, habbr, aabbr) {
     togo -= gain;
     if (togo <= 0) { down = 1; togo = 10; last += ", first down"; }
     else if (++down > 4) { down = 1; togo = 10; }
+    log.push({ text: last, type: lastType, yards: gain });
   }
   const scored = own >= 99;
-  if (scored) { last = "Touchdown! 3-yard run up the middle."; lastType = "Rushing Touchdown"; }
+  if (scored) { last = "Touchdown! 3-yard run up the middle."; lastType = "Rushing Touchdown"; log.push({ text: last, type: lastType, yards: 3, scoring: true }); }
   const opp = homeBall ? aabbr : habbr, mine = homeBall ? habbr : aabbr;
   const yd = Math.round(own);
   const spot = yd === 50 ? "50" : yd < 50 ? `${mine} ${yd}` : `${opp} ${100 - yd}`;
@@ -262,6 +265,7 @@ function drive(g, gameMin, hid, aid, habbr, aabbr) {
     isRedZone: 100 - yd <= 20,
     homeTimeouts: 3 - (g.seed % 2), awayTimeouts: 3 - ((g.seed >> 1) % 3),
     lastPlay: { text: `Demo: ${last}`, type: { text: lastType }, team: { id: String(homeBall ? hid : aid) } },
+    _drive: { team: String(homeBall ? hid : aid), start: `${mine} 25`, log, yards: yd - 25, n: log.length - 1, secs: Math.round(frac * LEN * 60) },
   };
 }
 
@@ -281,14 +285,18 @@ export function demoRoster(teamId, sport = "cfb") {
   }));
 }
 
-/** Box score for a demo game, filling in as the game goes (same parser as the real feed). */
-export async function fetchBox(id, { sport = "cfb" } = {}) {
+/**
+ * A demo game's detail, shaped like ESPN's summary feed: box score filling in as the game
+ * goes, the current drive's plays, and a win-probability line. Same parser as the real feed.
+ */
+export async function fetchSummary(id, { sport = "cfb" } = {}) {
   await new Promise((r) => setTimeout(r, 80));
   const m = /^([89])(\d{8})(\d{2})$/.exec(String(id));
-  if (!m) return { players: [], final: false };
+  const empty = parseSummary({});
+  if (!m) return empty;
   const date = new Date(+m[2].slice(0, 4), +m[2].slice(4, 6) - 1, +m[2].slice(6, 8));
   const g = slateFor(date, m[1] === "8" ? "nfl" : sport)[+m[3]];
-  if (!g) return { players: [], final: false };
+  if (!g) return empty;
   const ev = eventFor(g);
   const st = ev.competitions[0].status;
   const done = st.type.state === "post";
@@ -313,11 +321,26 @@ export async function fetchBox(id, { sport = "cfb" } = {}) {
           .concat([{ athlete: ath(ros.RB), stats: [String(now(rb.rec)), String(now(rb.ryds)), "0"] }]) },
     ];
   };
-  return parseBox({
+  const sit = ev.competitions[0].situation;
+  const d = sit?._drive;
+  const comps = ev.competitions[0].competitors;
+  const hs = Number(comps[0].score) || 0, as = Number(comps[1].score) || 0;
+  const left = 1 - played;
+  const pHome = done ? (hs > as ? 1 : 0) : 1 / (1 + Math.exp(-((hs - as) / (7 * Math.sqrt(left + 0.04)) + (g.home[6] - g.away[6]) / 25)));
+  return parseSummary({
     header: { competitions: [{ status: { type: { completed: done } } }] },
     boxscore: { players: [g.home, g.away].map((t) => ({ team: { id: String(t[0]) }, statistics: cats(t[0]) })) },
+    drives: d ? { current: {
+      team: { id: d.team },
+      description: `${d.n} play${d.n === 1 ? "" : "s"}, ${d.yards} yard${d.yards === 1 ? "" : "s"}, ${Math.floor(d.secs / 60)}:${String(d.secs % 60).padStart(2, "0")}`,
+      start: { text: d.start },
+      plays: d.log.map((p, i) => ({ text: p.text, type: { text: p.type }, statYardage: p.yards, scoringPlay: !!p.scoring, period: { number: st.period }, clock: { displayValue: st.displayClock && i === d.log.length - 1 ? st.displayClock : "" } })),
+    } } : undefined,
+    winprobability: st.type.state === "pre" ? [] : [{ homeWinPercentage: Math.round(pHome * 1000) / 1000, tiePercentage: 0 }],
   });
 }
+
+export const fetchBox = async (id, opts) => (await fetchSummary(id, opts)).box;
 
 const fmtA = (n) => (n > 0 ? `+${n}` : `${n}`);
 const fmtL = (n) => (n > 0 ? `+${n}` : `${n}`);

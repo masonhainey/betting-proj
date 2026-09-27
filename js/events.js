@@ -12,7 +12,7 @@ import { parseSlipText } from "./slipparse.js";
 import * as cloud from "./cloud.js";
 import { load, uid } from "./store.js";
 import { CLOUD, acct, acctSubmit, paintAcct, syncNow } from "./account.js";
-import { refreshNews, refreshSchedule, refreshToday, switchSport, tick } from "./data.js";
+import { refreshDetail, refreshNews, refreshSchedule, refreshToday, switchSport, tick } from "./data.js";
 import { selByKey, setSim, slipCalc, slipLegFromSel, toggleSel, trackSlip } from "./market.js";
 import { openSheet, paintDock, render } from "./render.js";
 import { formCalc, newFormLeg, openAdd, paintForm, propHint, saveForm } from "./sheets/add.js";
@@ -69,7 +69,10 @@ export const actions = {
   "add-for-game": (el) => openAdd({ gameId: el.dataset.id }),
   "open-settings": () => openSheet({ kind: "settings" }),
   "open-bet": (el) => openSheet({ kind: "bet", id: el.dataset.id }),
-  "open-game": (el) => openSheet({ kind: "game", id: el.dataset.id }),
+  "open-game": (el) => {
+    openSheet({ kind: "game", id: el.dataset.id });
+    refreshDetail(true);
+  },
   "open-slip": () => openSheet({ kind: "slip" }),
   "close-sheet": () => {
     S.sheet = null;

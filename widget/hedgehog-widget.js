@@ -153,6 +153,14 @@ function normalizeOdds(o, home, away) {
   }
   return out.ml || out.spread || out.total ? out : null;
 }
+var etClock = (d) => new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(d));
+function kickoff(iso, timeValid) {
+  if (!iso || !Number.isFinite(Date.parse(iso))) return { date: iso, timeValid: timeValid !== false };
+  const tbd = timeValid === false || etClock(iso) === "00:00";
+  if (!tbd) return { date: iso, timeValid: true };
+  const d = etDay(iso);
+  return { date: `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}T17:00:00Z`, timeValid: false };
+}
 function normalizeEvent(ev, sport = "cfb") {
   const comp = ev?.competitions?.[0];
   if (!comp) return null;
@@ -162,11 +170,12 @@ function normalizeEvent(ev, sport = "cfb") {
   const st = comp.status || ev.status || {};
   const type = st.type || {};
   const sit = comp.situation;
+  const { date, timeValid } = kickoff(comp.date || ev.date, comp.timeValid);
   return {
     id: String(ev.id),
     sport,
-    date: comp.date || ev.date,
-    timeValid: comp.timeValid !== false,
+    date,
+    timeValid,
     name: ev.name,
     shortName: ev.shortName || `${away.abbr} @ ${home.abbr}`,
     week: ev.week?.number ?? null,

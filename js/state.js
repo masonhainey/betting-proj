@@ -18,6 +18,7 @@ export const S = {
   bets: load(NS + "bets", []),
   games: new Map(),
   box: {}, // gameId → player box score, for props
+  detail: {}, // gameId → { drive, winProb, at } for the open game page
   todayIds: [],
   scheduleIds: [],
   news: [],

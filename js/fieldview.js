@@ -1,38 +1,45 @@
-// Apple Sports–style field graphic for live games: end zones in team colors, the line of
-// scrimmage, the line to gain, and the ball (with the offense's direction). The ball glides
-// to its new spot when the score feed moves it, and scores flash across the field.
+// Apple Sports–style field for live games. Built from plain HTML/CSS (no stretched SVG), so
+// lines stay crisp at any size. Small version on score cards, detailed one on a game's page
+// with yard numbers, hash marks, the drive so far, plays and win probability.
 
-import { fieldState } from "./field.js";
-import { esc } from "./ui.js";
+import { fieldState, parseSpot } from "./field.js";
+import { esc, logo } from "./ui.js";
 
-const seen = new Map(); // gameId → { x, from, movedAt, play, playAt }
+const seen = new Map(); // gameId → { f, x, from, movedAt, play, playAt }
 const ANIM_MS = 1400;
 const FLASH_MS = 6000;
 
-// ESPN colors are sometimes near-black or near-white; keep end zones readable on turf.
-function zoneColor(t) {
-  const hex = /^#?([0-9a-f]{6})$/i.exec(t.color || "")?.[1];
-  if (!hex) return "#3a3548";
-  const n = parseInt(hex, 16);
-  const lum = (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
-  return lum < 0.08 ? "#2b2b33" : lum > 0.92 ? "#cfcfd6" : `#${hex}`;
-}
-const inkOn = (hex) => {
+const lum = (hex) => {
   const n = parseInt(hex.slice(1), 16);
-  return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255 > 0.6 ? "#111" : "#fff";
+  return (0.299 * (n >> 16) + 0.587 * ((n >> 8) & 255) + 0.114 * (n & 255)) / 255;
 };
+// ESPN colors are sometimes near-black or near-white; keep end zones readable.
+export function teamColor(t) {
+  const hex = /^#?([0-9a-f]{6})$/i.exec(t?.color || "")?.[1];
+  if (!hex) return "#4b4560";
+  const c = `#${hex}`;
+  const l = lum(c);
+  return l < 0.07 ? "#34323d" : l > 0.93 ? "#c9c7d1" : c;
+}
+const inkOn = (c) => (lum(c) > 0.6 ? "#111" : "#fff");
 
-/** Track movement between refreshes so the ball can glide instead of jumping. */
-function motion(g, f) {
+/** Remember the last good position so a gap in ESPN's feed doesn't blank the field. */
+function track(g) {
   const now = Date.now();
+  const f = fieldState(g);
   let r = seen.get(g.id);
-  if (!r) seen.set(g.id, (r = { x: f.x, from: f.x, movedAt: 0, play: g.situation?.lastPlay || "", playAt: 0 }));
-  if (r.x !== f.x) Object.assign(r, { from: r.x, x: f.x, movedAt: now });
+  if (!r) seen.set(g.id, (r = { f: null, x: null, from: null, movedAt: 0, play: g.situation?.lastPlay || "", playAt: 0 }));
+  if (f) {
+    if (r.x != null && r.x !== f.x) Object.assign(r, { from: r.x, movedAt: now });
+    Object.assign(r, { f, x: f.x });
+  }
   const play = g.situation?.lastPlay || "";
-  if (play !== r.play) Object.assign(r, { play, playAt: now });
+  if (play && play !== r.play) Object.assign(r, { play, playAt: now });
   return {
-    dx: now - r.movedAt < ANIM_MS ? r.from - r.x : 0,
-    fresh: now - r.playAt < FLASH_MS && r.playAt > 0,
+    f: f || r.f,
+    stale: !f && !!r.f,
+    from: now - r.movedAt < ANIM_MS ? r.from : null,
+    fresh: r.playAt > 0 && now - r.playAt < FLASH_MS,
   };
 }
 
@@ -47,52 +54,87 @@ function flashFor(g) {
   return null;
 }
 
-/**
- * The field for a live game, or "" when there's no ball position. size: "sm" (score cards)
- * or "lg" (game sheet).
- */
-export function fieldGraphic(g, size = "sm") {
-  const f = fieldState(g);
-  if (!f) return "";
+function waiting(g) {
+  const d = `${g.shortDetail} ${g.detail}`;
+  if (/half/i.test(d)) return "Halftime";
+  if (/end of/i.test(d)) return d.match(/end of [^-·]+/i)?.[0].trim() || "End of quarter";
+  return "Waiting for the next snap";
+}
+
+const pct = (x) => `${Math.max(0, Math.min(100, x)).toFixed(2)}%`;
+
+/** Where the current drive started, in field coordinates (for the detailed field). */
+function driveStart(g, f) {
+  const d = g.detail?.drive;
+  if (!d || !f || d.teamId !== f.offense.id) return null;
+  const sp = parseSpot(d.startText);
+  if (!sp) return null;
+  if (sp.yd === 50 || !sp.abbr) return 50;
+  if (sp.abbr === g.away.abbr.toUpperCase()) return sp.yd;
+  if (sp.abbr === g.home.abbr.toUpperCase()) return 100 - sp.yd;
+  return null;
+}
+
+/** The field for a live game. size: "sm" (score cards) or "lg" (game page). */
+export function fieldGraphic(g, size = "sm", extra = null) {
+  if (g?.state !== "in") return "";
   const lg = size === "lg";
-  const W = 120, H = lg ? 44 : 20; // 10-yard end zones + 100-yard field
-  const X = (yd) => 10 + yd;
-  const { dx, fresh } = motion(g, f);
-  const away = zoneColor(g.away), home = zoneColor(g.home);
-  const lines = [];
-  for (let yd = 5; yd < 100; yd += 5) lines.push(`<line x1="${X(yd)}" y1="0" x2="${X(yd)}" y2="${H}" class="yl${yd % 10 ? " minor" : ""}${yd === 50 ? " mid" : ""}"/>`);
-  // Text sits outside the stretched SVG so it never distorts.
-  const nums = lg ? [10, 20, 30, 40, 50, 60, 70, 80, 90].map((yd) => `<span class="ynum" style="left:${((X(yd) / W) * 100).toFixed(2)}%">${yd > 50 ? 100 - yd : yd}</span>`).join("") : "";
-  const rzFrom = f.dir > 0 ? 80 : 0;
-  const bx = X(f.x);
-  const pct = (x) => `${((x / W) * 100).toFixed(2)}%`;
-  const flash = fresh ? flashFor(g) : null;
-  const flashColor = flash?.team ? zoneColor(flash.team) : "#a78bfa";
-  const zone = (x, c) => `<rect x="${x}" y="0" width="10" height="${H}" fill="${c}"/>`;
-  const ezLabel = (side, c, t) => (lg ? `<span class="ez ${side}" style="color:${inkOn(c)}">${esc(t.abbr)}</span>` : "");
-  return `<div class="field ${lg ? "lg" : "sm"} ${f.redZone ? "rz" : ""}" role="img" aria-label="${esc(`${f.offense.short} ball${f.label ? `, ${f.label}` : ""}, ${f.toGoal} yards to the end zone`)}">
-    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none">
-      <rect x="0" y="0" width="${W}" height="${H}" class="turf"/>
-      ${f.redZone ? `<rect x="${X(rzFrom)}" y="0" width="20" height="${H}" class="rzone"/>` : ""}
-      ${zone(0, away)}${zone(110, home)}
-      ${lines.join("")}
-      ${f.firstDown != null && f.firstDown > 0 && f.firstDown < 100 ? `<line x1="${X(f.firstDown)}" y1="0" x2="${X(f.firstDown)}" y2="${H}" class="ltg"/>` : ""}
-    </svg>
-    ${nums}${ezLabel("l", away, g.away)}${ezLabel("r", home, g.home)}
-    <span class="ball ${dx ? "moving" : ""}" style="left:${pct(bx)};--from:${pct(bx + dx)}">
-      <i class="los"></i><i class="pig"></i><i class="arrow ${f.dir > 0 ? "r" : "l"}"></i>
-    </span>
-    ${flash ? `<span class="flash" style="--fc:${flashColor};--fi:${inkOn(flashColor)}">${esc(flash.text)}</span>` : ""}
+  const { f, stale, from, fresh } = track(g);
+  const away = teamColor(g.away), home = teamColor(g.home);
+  const flash = fresh && !stale ? flashFor(g) : null;
+  const inRz = f && !stale && f.redZone;
+  const rzLeft = f ? (f.dir > 0 ? 80 : 0) : 0;
+  const nums = lg ? [10, 20, 30, 40, 50, 60, 70, 80, 90].map((yd) => `<span class="gf-num" style="left:${yd}%">${yd > 50 ? 100 - yd : yd}</span>`).join("") : "";
+  const ds = lg ? driveStart({ ...g, detail: extra }, f) : null;
+  const ez = (c, t, side) => `<div class="gf-ez ${side}" style="--tc:${c};color:${inkOn(c)}">${lg ? `<span>${esc(t.abbr)}</span>` : ""}</div>`;
+  const label = f ? `${f.offense.short} ball${f.label ? `, ${f.label}` : ""}, ${f.toGoal} yards to the end zone` : waiting(g);
+  return `<div class="gf ${lg ? "lg" : "sm"} ${inRz ? "rz" : ""} ${stale ? "stale" : ""}" role="img" aria-label="${esc(label)}">
+    ${ez(away, g.away, "l")}
+    <div class="gf-turf">
+      <i class="gf-mid"></i>${nums}
+      ${inRz ? `<div class="gf-rz" style="left:${rzLeft}%"></div>` : ""}
+      ${ds != null && f ? `<div class="gf-drive" style="left:${pct(Math.min(ds, f.x))};width:${pct(Math.abs(f.x - ds))};--tc:${teamColor(f.offense)}"></div>` : ""}
+      ${f && f.firstDown != null && f.firstDown > 0 && f.firstDown < 100 ? `<i class="gf-ltg" style="left:${pct(f.firstDown)}"></i>` : ""}
+      ${f ? `<div class="gf-ball ${from != null ? "moving" : ""}" style="left:${pct(f.x)};--from:${pct(from ?? f.x)}"><i class="gf-los"></i><i class="gf-pig ${f.dir > 0 ? "r" : "l"}"></i></div>` : `<span class="gf-msg">${esc(waiting(g))}</span>`}
+    </div>
+    ${ez(home, g.home, "r")}
+    ${flash ? `<span class="gf-flash" style="--fc:${flash.team ? teamColor(flash.team) : "#7c5cf0"};--fi:${inkOn(flash.team ? teamColor(flash.team) : "#7c5cf0")}">${esc(flash.text)}</span>` : ""}
   </div>`;
 }
 
-/** The line under the big field: "KC ball · 2nd & 7 at KC 35 · 65 yds to go". */
-export function fieldCaption(g) {
-  const f = fieldState(g);
-  if (!f) return "";
-  const s = g.situation;
-  const bits = [`<b>${esc(f.offense.abbr)} ball</b>`, f.label ? `${esc(f.label)}${s.spotText ? ` at ${esc(s.spotText)}` : ""}` : "", `${f.toGoal} yds to the end zone`];
-  const to = (n) => (Number.isFinite(n) ? `<span class="tos">${[0, 1, 2].map((i) => `<i class="${i < n ? "on" : ""}"></i>`).join("")}</span>` : "");
-  const tos = Number.isFinite(s.awayTimeouts) || Number.isFinite(s.homeTimeouts) ? `<span class="to-row"><span class="muted">Timeouts</span> ${esc(g.away.abbr)} ${to(s.awayTimeouts)} ${esc(g.home.abbr)} ${to(s.homeTimeouts)}</span>` : "";
-  return `<div class="field-cap">${bits.filter(Boolean).join(" · ")}${tos}</div>`;
+/** One line under the small field: "BAL ball · 1st & 10 at BAL 35". */
+export function fieldLine(g) {
+  if (g?.state !== "in") return "";
+  const f = fieldState(g) || seen.get(g.id)?.f;
+  if (!f) return `<span class="muted">${esc(waiting(g))}</span>`;
+  const s = g.situation || {};
+  return `<b>${esc(f.offense.abbr)} ball</b>${f.label ? ` · ${esc(f.label)}` : ""}${s.spotText ? ` <span class="muted">at ${esc(s.spotText)}</span>` : ""}`;
+}
+
+/** Everything under the big field on a game's page. */
+export function fieldDetail(g, extra) {
+  if (g?.state !== "in") return "";
+  const f = fieldState(g) || seen.get(g.id)?.f;
+  const s = g.situation || {};
+  const to = (n) => (Number.isFinite(n) ? `<span class="gf-tos" title="${n} timeout${n === 1 ? "" : "s"} left">${[0, 1, 2].map((i) => `<i class="${i < n ? "on" : ""}"></i>`).join("")}</span>` : "");
+  const head = f
+    ? `<div class="gf-head">
+        <span class="gf-poss">${logo(f.offense, 22)}<b>${esc(f.offense.abbr)} ball</b></span>
+        ${f.label ? `<span class="gf-down">${esc(f.label)}</span>` : ""}
+        <span class="gf-spot">${s.spotText ? `at ${esc(s.spotText)} · ` : ""}${f.toGoal} yds to the end zone</span>
+      </div>`
+    : `<div class="gf-head"><span class="gf-spot">${esc(waiting(g))}</span></div>`;
+  const chips = [
+    extra?.drive?.desc && extra.drive.teamId === f?.offense.id ? `<span class="gf-chip"><small>Drive</small>${esc(extra.drive.desc.replace(/,\s*/g, " · "))}</span>` : "",
+    Number.isFinite(s.awayTimeouts) || Number.isFinite(s.homeTimeouts) ? `<span class="gf-chip"><small>Timeouts</small>${esc(g.away.abbr)} ${to(s.awayTimeouts)} ${esc(g.home.abbr)} ${to(s.homeTimeouts)}</span>` : "",
+  ].filter(Boolean).join("");
+  const wp = extra?.winProb;
+  const wpBar = wp
+    ? `<div class="gf-wp"><div class="gf-wp-h"><span>${logo(g.away, 16)}${esc(g.away.abbr)} <b>${Math.round(wp.away * 100)}%</b></span><small>Win probability</small><span><b>${Math.round(wp.home * 100)}%</b> ${esc(g.home.abbr)}${logo(g.home, 16)}</span></div>
+        <div class="gf-wp-bar"><i style="width:${pct(wp.away * 100)};background:${teamColor(g.away)}"></i><i style="width:${pct(wp.home * 100)};background:${teamColor(g.home)}"></i></div></div>`
+    : "";
+  const plays = extra?.drive?.plays?.length
+    ? `<ol class="gf-plays">${extra.drive.plays.map((p) => `<li class="${p.scoring ? "score" : ""}"><span class="gf-clk">${p.period ? `Q${p.period > 4 ? "OT" : p.period}` : ""}${p.clock ? ` ${esc(p.clock)}` : ""}</span><span>${esc(p.text.replace(/^Demo:\s*/, ""))}</span>${p.yards ? `<b class="${p.yards > 0 ? "up" : "down"}">${p.yards > 0 ? "+" : ""}${p.yards}</b>` : ""}</li>`).join("")}</ol>`
+    : s.lastPlay ? `<p class="gf-last">${esc(s.lastPlay)}</p>` : "";
+  return `<div class="gf-info">${head}${chips ? `<div class="gf-chips">${chips}</div>` : ""}${wpBar}${plays}</div>`;
 }

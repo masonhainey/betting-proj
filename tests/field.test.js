@@ -35,3 +35,8 @@ test("falls back to yards-to-endzone; nothing to draw without a ball", () => {
   assert.equal(fieldState(game({ possession: "2", spotText: "" })), null);
   assert.equal(fieldState({ ...game({ possession: "2", spotText: "BUF 20" }), state: "post" }), null);
 });
+
+test("between plays, the team on the last play stands in for possession", () => {
+  const f = fieldState(game({ possession: null, lastPlayTeam: "12", spotText: "KC 40", down: 1, distance: 10 }));
+  assert.deepEqual([f.offense.abbr, f.x, f.dir], ["KC", 60, -1]);
+});

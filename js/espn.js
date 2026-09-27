@@ -1,7 +1,7 @@
 // ESPN's public site API. It serves CORS headers, so the browser calls it directly —
 // no relay to break. Every response gets normalized into one flat Game shape.
 
-import { parseBox } from "./props.js";
+import { parseSummary } from "./summary.js";
 
 const ROOT = "https://site.api.espn.com/apis/site/v2/sports/football";
 
@@ -85,11 +85,12 @@ export async function fetchRange(start, days, opts) {
   return { games: [...byId.values()], failedDays };
 }
 
-/** Player box score for one game (the feed behind ESPN's Gamecast). */
-export async function fetchBox(id, { sport = "cfb" } = {}) {
-  const data = await getJSON(`${ROOT}/${sportOf(sport).path}/summary?event=${encodeURIComponent(id)}`);
-  return parseBox(data);
+/** One game's detail: player box score, current drive, win probability (ESPN Gamecast feed). */
+export async function fetchSummary(id, { sport = "cfb" } = {}) {
+  return parseSummary(await getJSON(`${ROOT}/${sportOf(sport).path}/summary?event=${encodeURIComponent(id)}`));
 }
+
+export const fetchBox = async (id, opts) => (await fetchSummary(id, opts)).box;
 
 export async function fetchNews({ sport = "cfb", limit = 40 } = {}) {
   const data = await getJSON(`${ROOT}/${sportOf(sport).path}/news?limit=${limit}`);
@@ -167,6 +168,22 @@ export function normalizeOdds(o, home, away) {
   return out.ml || out.spread || out.total ? out : null;
 }
 
+const etClock = (d) => new Intl.DateTimeFormat("en-US", { timeZone: "America/New_York", hour: "2-digit", minute: "2-digit", hourCycle: "h23" }).format(new Date(d));
+
+/**
+ * Games without a kickoff time yet ("TBD") come from ESPN at midnight Eastern on game day,
+ * which is Friday evening in Central/Pacific time. Pin those to midday Eastern on the right
+ * date so every timezone files them on the correct day. Nobody kicks off at midnight ET,
+ * so a midnight time is treated as TBD too.
+ */
+export function kickoff(iso, timeValid) {
+  if (!iso || !Number.isFinite(Date.parse(iso))) return { date: iso, timeValid: timeValid !== false };
+  const tbd = timeValid === false || etClock(iso) === "00:00";
+  if (!tbd) return { date: iso, timeValid: true };
+  const d = etDay(iso);
+  return { date: `${d.slice(0, 4)}-${d.slice(4, 6)}-${d.slice(6)}T17:00:00Z`, timeValid: false };
+}
+
 export function normalizeEvent(ev, sport = "cfb") {
   const comp = ev?.competitions?.[0];
   if (!comp) return null;
@@ -176,11 +193,12 @@ export function normalizeEvent(ev, sport = "cfb") {
   const st = comp.status || ev.status || {};
   const type = st.type || {};
   const sit = comp.situation;
+  const { date, timeValid } = kickoff(comp.date || ev.date, comp.timeValid);
   return {
     id: String(ev.id),
     sport,
-    date: comp.date || ev.date,
-    timeValid: comp.timeValid !== false,
+    date,
+    timeValid,
     name: ev.name,
     shortName: ev.shortName || `${away.abbr} @ ${home.abbr}`,
     week: ev.week?.number ?? null,
