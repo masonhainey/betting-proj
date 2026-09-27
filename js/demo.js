@@ -4,6 +4,7 @@
 // scores tick, bets swing and auto-grade in a single sitting.
 
 import { normalizeEvent, addDays, ymd } from "./espn.js";
+import { parseBox } from "./props.js";
 
 const TEAMS = [
   // id, abbr, short, full, color, alt, rating
@@ -262,6 +263,60 @@ function drive(g, gameMin, hid, aid, habbr, aabbr) {
     homeTimeouts: 3 - (g.seed % 2), awayTimeouts: 3 - ((g.seed >> 1) % 3),
     lastPlay: { text: `Demo: ${last}`, type: { text: lastType }, team: { id: String(homeBall ? hid : aid) } },
   };
+}
+
+// ───────── demo box scores (player props) ─────────
+
+const FIRST = ["Jalen", "Marcus", "Tyler", "Caleb", "Drew", "Jaylen", "Bo", "Quinn", "Trey", "Malik", "Cam", "Devin", "Isaiah", "Kyle", "Xavier", "Luke", "Deion", "Ryan", "Chase", "Nico"];
+const LAST = ["Reed", "Carter", "Hayes", "Brooks", "Maddox", "Sutton", "Price", "Ellis", "Banks", "Pierce", "Walker", "Holt", "Rivers", "Dixon", "Shaw", "Lowe", "Grant", "Nash", "Bishop", "Ford"];
+const SLOTS = ["QB", "RB", "WR1", "WR2", "TE"];
+
+/** Made-up but stable (and unique) names for a demo team's skill players. */
+export function demoRoster(teamId, sport = "cfb") {
+  const list = teamsFor(sport);
+  const t = Math.max(0, list.findIndex((x) => String(x[0]) === String(teamId)));
+  return Object.fromEntries(SLOTS.map((k, i) => {
+    const idx = (sport === "nfl" ? 200 : 0) + t * SLOTS.length + i;
+    return [k, { id: `${sport}${teamId}-${i}`, name: `${FIRST[idx % FIRST.length]} ${LAST[Math.floor(idx / FIRST.length) % LAST.length]}` }];
+  }));
+}
+
+/** Box score for a demo game, filling in as the game goes (same parser as the real feed). */
+export async function fetchBox(id, { sport = "cfb" } = {}) {
+  await new Promise((r) => setTimeout(r, 80));
+  const m = /^([89])(\d{8})(\d{2})$/.exec(String(id));
+  if (!m) return { players: [], final: false };
+  const date = new Date(+m[2].slice(0, 4), +m[2].slice(4, 6) - 1, +m[2].slice(6, 8));
+  const g = slateFor(date, m[1] === "8" ? "nfl" : sport)[+m[3]];
+  if (!g) return { players: [], final: false };
+  const ev = eventFor(g);
+  const st = ev.competitions[0].status;
+  const done = st.type.state === "post";
+  const played = done ? 1 : st.type.state === "in" ? Math.min(1, ((st.period - 1) * 15 + (15 - parseFloat(st.displayClock))) / 60) : 0;
+  const cats = (teamId) => {
+    const ros = demoRoster(teamId, g.sport);
+    const r = rng(g.seed + Number(teamId));
+    const full = (lo, hi) => lo + r() * (hi - lo);
+    const now = (v, whole) => (whole ? Math.floor(v * played + 0.001) : Math.round(v * played));
+    const qb = { att: full(25, 42), yds: full(160, 340), td: Math.floor(full(0, 4)), int: Math.floor(full(0, 2)), ry: full(0, 40), rc: full(2, 7) };
+    const rb = { car: full(10, 24), yds: full(30, 140), td: Math.floor(full(0, 2.4)), rec: full(1, 5), ryds: full(5, 45) };
+    const wr = [[3, 10, 40, 140], [2, 7, 20, 90], [2, 7, 15, 80]].map(([a, b, c, d]) => ({ rec: full(a, b), yds: full(c, d), td: Math.floor(full(0, 1.8)) }));
+    const ath = (p) => ({ id: p.id, displayName: p.name, shortName: `${p.name[0]}. ${p.name.split(" ")[1]}` });
+    return [
+      { name: "passing", keys: ["completions/passingAttempts", "passingYards", "passingTouchdowns", "interceptions"],
+        athletes: [{ athlete: ath(ros.QB), stats: [`${now(qb.att * 0.64)}/${now(qb.att)}`, String(now(qb.yds)), String(now(qb.td, 1)), String(now(qb.int, 1))] }] },
+      { name: "rushing", keys: ["rushingAttempts", "rushingYards", "rushingTouchdowns"],
+        athletes: [{ athlete: ath(ros.RB), stats: [String(now(rb.car)), String(now(rb.yds)), String(now(rb.td, 1))] },
+          { athlete: ath(ros.QB), stats: [String(now(qb.rc)), String(now(qb.ry)), "0"] }] },
+      { name: "receiving", keys: ["receptions", "receivingYards", "receivingTouchdowns"],
+        athletes: [["WR1", 0], ["WR2", 1], ["TE", 2]].map(([k, i]) => ({ athlete: ath(ros[k]), stats: [String(now(wr[i].rec)), String(now(wr[i].yds)), String(now(wr[i].td, 1))] }))
+          .concat([{ athlete: ath(ros.RB), stats: [String(now(rb.rec)), String(now(rb.ryds)), "0"] }]) },
+    ];
+  };
+  return parseBox({
+    header: { competitions: [{ status: { type: { completed: done } } }] },
+    boxscore: { players: [g.home, g.away].map((t) => ({ team: { id: String(t[0]) }, statistics: cats(t[0]) })) },
+  });
 }
 
 const fmtA = (n) => (n > 0 ? `+${n}` : `${n}`);

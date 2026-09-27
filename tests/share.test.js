@@ -78,3 +78,14 @@ test("share text", () => {
   assert.match(shareText(t, { status: "won", profit: 99.2 }), /^💰 Cashed my 2-leg parlay \(\+496\) for \+\$99\.20/);
   assert.match(shareText({ ...t, kind: "slip" }), /Thinking about this/);
 });
+
+test("a tailed player prop is re-read from its text, so it tracks for the tailer too", async () => {
+  const { relinkLegs } = await import("../js/relink.js");
+  const b = { ...bet, legs: [{ id: "p", pick: "Josh Allen Over 250.5 Passing Yards", odds: 1.9, status: "open", gameId: "401772001", sport: "nfl", market: "prop", prop: { player: "Josh Allen", stat: "pass_yds", side: "over", line: 250.5 } }] };
+  const t = decodeShare(encodeShare(b));
+  assert.equal(t.legs[0].market, undefined);
+  const tailed = { id: "t", createdAt: new Date().toISOString(), stake: 5, legs: t.legs.map((l) => ({ id: "x", ...l })) };
+  relinkLegs([tailed], []);
+  assert.deepEqual(tailed.legs[0].prop, { player: "Josh Allen", stat: "pass_yds", side: "over", line: 250.5 });
+  assert.equal(tailed.legs[0].gameId, "401772001");
+});

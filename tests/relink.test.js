@@ -28,14 +28,28 @@ test("moneyline and total picks link too", () => {
   assert.equal(bets[2].legs[0].side, "home");
 });
 
-test("props, team totals and halves are never graded off the final score", () => {
-  for (const pick of ["UCLA team total over 24.5", "Dante Moore over 250.5 passing yards", "UCLA 1H +3", "Oregon -7 2nd half", "UCLA anytime TD"]) {
+test("team totals and halves are never graded off the final score", () => {
+  for (const pick of ["UCLA team total over 24.5", "UCLA 1H +3", "Oregon -7 2nd half"]) {
     const bets = [bet(pick)];
     assert.equal(needsLink(bets[0].legs[0]), false, pick);
     assert.equal(relinkLegs(bets, games).length, 0, pick);
     const m = linkPick(pick, games);
     assert.ok(!m || m.market === "other", `import must not make "${pick}" gradeable`);
   }
+});
+
+test("player props become props (graded from the box score, not the final score)", () => {
+  const b = bet("Dante Moore over 250.5 passing yards");
+  relinkLegs([b], games);
+  const l = b.legs[0];
+  assert.equal(l.market, "prop");
+  assert.deepEqual(l.prop, { player: "Dante Moore", stat: "pass_yds", side: "over", line: 250.5 });
+  assert.equal(l.gameId, undefined, "no team named: found later in box scores");
+  assert.equal(autoGrade([b], (id) => games.find((g) => g.id === id)).length, 0);
+  const named = bet("Dante Moore (ORE) over 250.5 passing yards");
+  named.legs[0].gameLabel = "UCLA @ ORE";
+  relinkLegs([named], games);
+  assert.equal(named.legs[0].gameId, "401", "slip's matchup line links the game");
 });
 
 test("only games near when the bet was placed; settled and linked legs are left alone", () => {

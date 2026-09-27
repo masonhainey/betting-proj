@@ -17,10 +17,11 @@ export const S = {
   tab: TABS.includes(location.hash.slice(1)) ? location.hash.slice(1) : "bets",
   bets: load(NS + "bets", []),
   games: new Map(),
+  box: {}, // gameId → player box score, for props
   todayIds: [],
   scheduleIds: [],
   news: [],
-  st: { today: {}, schedule: {}, news: {}, betGames: {} },
+  st: { today: {}, schedule: {}, news: {}, betGames: {}, boxes: {} },
   kick: load(NS + "kickoffs", {}),
   lines: load(NS + "lines", {}),
   slip: { mode: "parlay", legs: [], stakes: {}, stake: settings.unit, override: "", boost: "", book: settings.lastBook || "", ...load(NS + "slip", {}) },

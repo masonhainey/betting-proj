@@ -31,6 +31,63 @@ module.exports = __toCommonJS(core_exports);
 var SUPABASE_URL = "https://vcmgdhmhizyqjnyjxmcl.supabase.co";
 var SUPABASE_ANON_KEY = "sb_publishable_uKY0eEvFEDrBlD_jpOzEPA_MAb1PSLw";
 
+// js/props.js
+var STATS = {
+  pass_yds: { label: "Passing yards", short: "pass yds", v: (s) => s.passYds },
+  pass_tds: { label: "Passing TDs", short: "pass TD", v: (s) => s.passTD },
+  completions: { label: "Completions", short: "comp", v: (s) => s.cmp },
+  pass_att: { label: "Pass attempts", short: "att", v: (s) => s.att },
+  ints: { label: "Interceptions thrown", short: "INT", v: (s) => s.int },
+  rush_yds: { label: "Rushing yards", short: "rush yds", v: (s) => s.rushYds },
+  rush_att: { label: "Rushing attempts", short: "carries", v: (s) => s.rushAtt },
+  rush_tds: { label: "Rushing TDs", short: "rush TD", v: (s) => s.rushTD },
+  receptions: { label: "Receptions", short: "rec", v: (s) => s.rec },
+  rec_yds: { label: "Receiving yards", short: "rec yds", v: (s) => s.recYds },
+  rec_tds: { label: "Receiving TDs", short: "rec TD", v: (s) => s.recTD },
+  rush_rec_yds: { label: "Rush + rec yards", short: "rush+rec yds", v: (s) => s.rushYds + s.recYds },
+  pass_rush_yds: { label: "Pass + rush yards", short: "pass+rush yds", v: (s) => s.passYds + s.rushYds },
+  anytime_td: { label: "Anytime TD", short: "TD", v: (s) => s.rushTD + s.recTD }
+};
+var norm = (s) => String(s || "").toLowerCase().replace(/\b(jr|sr|ii|iii|iv|v)\b\.?/g, " ").replace(/[^a-z ]/g, " ").replace(/\s+/g, " ").trim();
+function findPlayer(name, players) {
+  const want = norm(name);
+  if (!want || !players?.length) return null;
+  const exact = players.find((p) => norm(p.name) === want);
+  if (exact) return exact;
+  const parts = want.split(" ");
+  const last = parts[parts.length - 1];
+  const first = parts.length > 1 ? parts[0] : "";
+  const byLast = players.filter((p) => norm(p.name).split(" ").pop() === last);
+  if (first) {
+    const init = byLast.filter((p) => norm(p.name).startsWith(first[0]));
+    if (init.length === 1) return init[0];
+    const short = players.find((p) => norm(p.short) === want);
+    if (short) return short;
+  }
+  return byLast.length === 1 ? byLast[0] : null;
+}
+function played(game) {
+  if (game?.state !== "in" || !game.period) return 0;
+  if (game.period > 4) return 1;
+  const [m, s] = String(game.clock || "").split(":").map(Number);
+  const left = Number.isFinite(m) ? m + (s || 0) / 60 : 15;
+  return Math.min(1, ((game.period - 1) * 15 + (15 - left)) / 60);
+}
+function propMargin(leg, game) {
+  const p = leg.prop;
+  const box = game?.box;
+  if (!p || !box || !STATS[p.stat]) return null;
+  const pl = findPlayer(p.player, box.players);
+  if (!pl) return null;
+  const value = STATS[p.stat].v(pl.stats);
+  const margin = p.side === "under" ? p.line - value : value - p.line;
+  const unit = STATS[p.stat].short;
+  let text2 = p.side === "yes" ? value > 0 ? `Scored${value > 1 ? ` \xD7${value}` : ""}` : "No TD yet" : `${value} / ${p.line} ${unit}`;
+  const f = played(game);
+  if (p.side !== "yes" && f > 0.12 && f < 1 && game.state === "in") text2 += ` \xB7 on pace for ${Math.round(value / f)}`;
+  return { margin, text: text2, value, player: pl.name };
+}
+
 // js/espn.js
 var ROOT = "https://site.api.espn.com/apis/site/v2/sports/football";
 var SPORTS = {
@@ -228,6 +285,7 @@ function scores(game) {
   return Number.isFinite(h) && Number.isFinite(a) ? { h, a } : null;
 }
 function legMargin(leg, game) {
+  if (leg.market === "prop") return propMargin(leg, game);
   if (!game || !leg.market || !["ml", "spread", "total"].includes(leg.market)) return null;
   const sc = scores(game);
   if (!sc) return null;
@@ -251,6 +309,7 @@ function totalText(leg, sum, m) {
 }
 function gradeLeg(leg, game) {
   if (!game || game.state !== "post" || !game.completed) return null;
+  if (leg.market === "prop" && !game.box?.final) return null;
   const r = legMargin(leg, game);
   if (!r) return null;
   return r.margin > 0 ? "won" : r.margin < 0 ? "lost" : "push";
@@ -260,7 +319,8 @@ function legLive(leg, game) {
   if (!game) return { state: "pending", text: "" };
   if (game.state === "pre") return { state: "pending", text: "" };
   const r = legMargin(leg, game);
-  if (!r) return { state: game.state === "in" ? "live" : "pending", text: "" };
+  if (!r) return { state: game.state === "in" ? "live" : "pending", text: leg.market === "prop" && game.box && !r ? "Player not in the box score yet" : "" };
+  if (leg.market === "prop" && game.state === "in" && r.margin <= 0 && leg.prop?.side !== "under") return { state: "live", text: r.text };
   return { state: r.margin > 0 ? "winning" : r.margin < 0 ? "losing" : "even", text: r.text };
 }
 

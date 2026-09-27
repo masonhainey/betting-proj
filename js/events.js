@@ -15,7 +15,7 @@ import { CLOUD, acct, acctSubmit, paintAcct, syncNow } from "./account.js";
 import { refreshNews, refreshSchedule, refreshToday, switchSport, tick } from "./data.js";
 import { selByKey, setSim, slipCalc, slipLegFromSel, toggleSel, trackSlip } from "./market.js";
 import { openSheet, paintDock, render } from "./render.js";
-import { formCalc, newFormLeg, openAdd, paintForm, saveForm } from "./sheets/add.js";
+import { formCalc, newFormLeg, openAdd, paintForm, propHint, saveForm } from "./sheets/add.js";
 import { hedgeText } from "./sheets/bet.js";
 import { handleImage, handleText, importPreview, openDraft } from "./sheets/import.js";
 import { $, $$, NS, S, TABS, fmt, game, num, odds, saveBets, saveSettings, saveSlip, settings, toast } from "./state.js";
@@ -530,7 +530,11 @@ export const inputs = {
     b.note = el.value;
     saveBets();
   },
-  "f-pick": (el) => (formLeg(el.dataset.id).pick = el.value),
+  "f-pick": (el) => {
+    formLeg(el.dataset.id).pick = el.value;
+    const hint = document.getElementById(`f-prop-${el.dataset.id}`);
+    if (hint) hint.innerHTML = propHint(el.value);
+  },
   "f-odds": (el) => {
     const l = formLeg(el.dataset.id);
     l.uncertain = false;

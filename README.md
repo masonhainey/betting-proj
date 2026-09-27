@@ -76,6 +76,25 @@ A lost parlay's detail view also names the leg or legs that sank it.
 
 **Ticket payout.** Books don't always pay exactly what the leg odds multiply to. They round each leg's price, price same-game parlays with their own correlation math, and prices can move between building a slip and placing it. Enter the payout printed on your ticket, either when adding the bet or later from the bet's detail view. hedgehog will use that number and show how far off the leg math was.
 
+## Player props
+
+Type or import a prop the way books write it:
+- "Josh Allen over 250.5 passing yards", "J. Allen o250.5 pass yds"
+- "Kelce 6+ receptions", "Derrick Henry anytime TD", "Bijan Robinson rush + rec yards u110.5"
+
+hedgehog reads the player, stat, over/under and line.
+
+- **Tracking:** live progress comes from ESPN's box score ("142 / 224.5 pass yds · on pace for 304"), with a progress bar on the bet card.
+- **Settling:** the prop settles itself from the final box score, and closed-app alerts fire for it too.
+- **Finding the game:** from a team in the pick or the slip's matchup line. If neither names one, hedgehog searches that day's box scores for the player once games start. It only links when exactly one game has that player, so it never guesses.
+- **Stats covered:**
+  - passing: yards, TDs, completions, attempts, interceptions
+  - rushing: yards, attempts, TDs
+  - receiving: receptions, yards, TDs
+  - combined: rush + rec yards, pass + rush yards
+  - anytime TD
+- **When it won't settle:** a player missing from the final box score stays open for you to settle by hand. It's never auto-voided.
+
 ## College football and NFL
 
 The **CFB | NFL** switch in the header swaps Live, Upcoming, Build and News between leagues. Your choice is remembered on each device.

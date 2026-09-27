@@ -7,7 +7,7 @@
 // Push signing (VAPID) keys are created on first run and kept in Supabase (app_secrets),
 // so no other secrets are needed.
 
-import { etDay, fetchScoreboard } from "../js/espn.js";
+import { etDay, fetchBox as espnBox, fetchScoreboard } from "../js/espn.js";
 import { computeServerEvents } from "../js/alertrules.js";
 
 const MAX_PER_USER = 6; // never flood someone (e.g. first run after days away)
@@ -36,7 +36,7 @@ export function supabase(url, key, fetchImpl = fetch) {
 
 export { etDay };
 
-export async function run({ db, send, generateKeys, fetchGames = defaultFetchGames, now = new Date(), log = console.log }) {
+export async function run({ db, send, generateKeys, fetchGames = defaultFetchGames, fetchBox = defaultFetchBox, now = new Date(), log = console.log }) {
   // 1. Push signing keys (made once, kept server-side).
   let vapid = (await db.get("app_secrets?name=eq.vapid&select=value"))[0]?.value;
   if (!vapid) {
@@ -78,6 +78,22 @@ export async function run({ db, send, generateKeys, fetchGames = defaultFetchGam
   const games = await fetchGames([...days]);
   const game = (id) => games.get(String(id));
 
+  // 4b. Final box scores for games with open player props, so props settle too.
+  const propGames = new Map();
+  for (const bets of Object.values(betsByUser)) {
+    for (const b of bets) for (const l of b.legs) {
+      const g = l.status === "open" && l.market === "prop" && l.gameId ? game(l.gameId) : null;
+      if (g?.state === "post" && g.completed && !g.box) propGames.set(g.id, l.sport === "nfl" ? "nfl" : "cfb");
+    }
+  }
+  for (const [id, sport] of propGames) {
+    try {
+      game(id).box = await fetchBox(id, sport);
+    } catch (e) {
+      log(`Box score ${id} failed: ${e.message}`);
+    }
+  }
+
   // 5. New events → dedupe via push_log → send to each device (respecting its prefs).
   let sent = 0, events = 0;
   for (const u of users) {
@@ -104,6 +120,8 @@ export async function run({ db, send, generateKeys, fetchGames = defaultFetchGam
   log(`${subs.length} device(s), ${events} new alert(s), ${sent} sent.`);
   return { vapid, sent, events };
 }
+
+const defaultFetchBox = (id, sport) => espnBox(id, { sport });
 
 async function defaultFetchGames(days) {
   const games = new Map();

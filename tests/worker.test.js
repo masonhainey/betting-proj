@@ -101,3 +101,23 @@ test("eastern-time day and secret-key headers", async () => {
   assert.equal(seen.init.headers.apikey, "sb_secret_abc");
   assert.equal(seen.init.headers.Authorization, undefined, "new secret keys aren't JWTs");
 });
+
+test("player props settle from the final box score and alert", async () => {
+  const state = setup();
+  state.vapid = { publicKey: "PUB", privateKey: "PRIV" };
+  state.subs = [state.subs[0]];
+  state.records = [{ user_id: "u1", id: "p1", data: { stake: 10, legs: [{ id: "l1", pick: "Josh Allen Over 250.5 Passing Yards", odds: 1.9, status: "open", gameId: "401", sport: "nfl", market: "prop", prop: { player: "Josh Allen", stat: "pass_yds", side: "over", line: 250.5 }, kickoff }] } }];
+  const sent = [];
+  const boxes = [];
+  await run({
+    db: fakeDb(state),
+    send: async (s, p) => sent.push(p.title),
+    generateKeys: () => ({}),
+    fetchGames: async () => new Map([["401", G("401", 28, 21)]]),
+    fetchBox: async (id, sport) => (boxes.push([id, sport]), { final: true, players: [{ id: "1", name: "Josh Allen", short: "J. Allen", team: "2", stats: { passYds: 262, passTD: 2, cmp: 24, att: 35, int: 0, rushYds: 0, rushAtt: 0, rushTD: 0, rec: 0, recYds: 0, recTD: 0 } }] }),
+    now,
+    log: () => {},
+  });
+  assert.deepEqual(boxes, [["401", "nfl"]]);
+  assert.deepEqual(sent, ["💰 Cashed: Josh Allen Over 250.5 Passing Yards"]);
+});

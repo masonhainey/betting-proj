@@ -5,6 +5,7 @@ import { ymd, addDays, etDay } from "./espn.js";
 import { americanToDecimal, fmtMoney } from "./odds.js";
 import { betStatus, betProfit, legLabel, autoGrade } from "./grade.js";
 import { needsLink, relinkLegs } from "./relink.js";
+import { findPlayer } from "./props.js";
 import * as cloud from "./cloud.js";
 import { load, save, uid } from "./store.js";
 import { tagArticle } from "./news.js";
@@ -37,6 +38,7 @@ export function saveCache() {
 export function merge(games) {
   const now = Date.now();
   for (const g of games) {
+    if (S.box[g.id]) g.box = S.box[g.id];
     S.games.set(g.id, g);
     const k = S.kick[g.id];
     if (!k) S.kick[g.id] = { d: g.date, tv: g.timeValid };
@@ -183,6 +185,69 @@ export async function refreshBetGames() {
   afterData();
 }
 
+/**
+ * Box scores for games you have player props on: live progress, and the final line to
+ * settle them. Props with no game yet get found by searching the day's box scores.
+ */
+const boxAt = {}; // gameId → last fetch
+const nameKey = (s) => String(s).toLowerCase().replace(/[^a-z]/g, "");
+export async function refreshBoxes() {
+  const st = S.st.boxes;
+  const now = Date.now();
+  const want = new Map(); // gameId → league
+  const hunting = []; // prop legs with no game yet
+  for (const b of S.bets) {
+    if (betStatus(b) !== "open") continue;
+    for (const l of b.legs) {
+      if (l.status !== "open" || l.market !== "prop" || !l.prop) continue;
+      if (!l.gameId) { hunting.push({ b, l }); continue; }
+      const g = game(l.gameId);
+      if (g && g.state !== "pre" && !S.box[g.id]?.final) want.set(g.id, legSport(l));
+    }
+  }
+  const huntOnly = new Set();
+  if (hunting.length) {
+    for (const g of S.games.values()) {
+      if (g.state === "pre" || want.has(g.id) || want.size >= 40) continue;
+      const t = Date.parse(g.date);
+      if (hunting.some(({ b }) => { const p = Date.parse(b.createdAt) || now; return t >= p - 12 * 3600e3 && t <= p + 36 * 3600e3; })) {
+        want.set(g.id, g.sport || "cfb");
+        huntOnly.add(g.id);
+      }
+    }
+  }
+  const due = [...want].filter(([id]) => {
+    const g = game(id), last = boxAt[id] || 0;
+    if (S.box[id]?.final) return false;
+    const every = huntOnly.has(id) ? (settings.demo ? 20000 : 180000) : g?.state === "in" ? (settings.demo ? 8000 : 45000) : 60000;
+    return now - last >= every;
+  });
+  if (!due.length || st.loading) return;
+  st.loading = true;
+  const res = await Promise.allSettled(due.map(([id, sp]) => (boxAt[id] = now, src().fetchBox(id, { sport: sp }).then((box) => [id, box]))));
+  st.loading = false;
+  for (const r of res) {
+    if (r.status !== "fulfilled") continue;
+    const [id, box] = r.value;
+    S.box[id] = box;
+    const g = game(id);
+    if (g) g.box = box;
+  }
+  // Link props to the game their player turned up in (only when it's one game, not a guess).
+  let linked = 0;
+  for (const { l } of hunting) {
+    const found = Object.entries(S.box).filter(([id]) => game(id)).map(([id, box]) => [id, findPlayer(l.prop.player, box.players)]).filter(([, p]) => p);
+    const exact = found.filter(([, p]) => nameKey(p.name) === nameKey(l.prop.player));
+    const hits = exact.length ? exact : found;
+    if (hits.length !== 1) continue; // nobody, or more than one game: don't guess
+    const g = game(hits[0][0]);
+    Object.assign(l, { gameId: g.id, sport: g.sport || "cfb", gameLabel: g.shortName, kickoff: g.date, autoLinked: true });
+    linked++;
+  }
+  if (linked) saveBets();
+  afterData();
+}
+
 export async function refreshNews() {
   const st = S.st.news;
   st.loading = true;
@@ -237,6 +302,7 @@ export function tick(force) {
       st.tried = now;
       refreshToday();
       if (!S.st.betGames.loading) refreshBetGames(); // your games in the other league
+      refreshBoxes(); // player props
     }
     return;
   }
@@ -255,6 +321,7 @@ export function tick(force) {
   due("schedule", 600000, refreshSchedule);
   due("betGames", liveAction(now) ? 30000 : 90000, refreshBetGames);
   due("news", 600000, refreshNews);
+  due("boxes", settings.demo ? 8000 : 30000, refreshBoxes);
   paintAgo();
   if (CLOUD && cloud.currentUser() && !document.hidden && Date.now() - Math.max(acct.lastSync, acct.lastTry || 0) > 30000) syncNow();
 }
@@ -318,6 +385,20 @@ export function seedDemo() {
   }
   if (pre2) bets.push({ id: uid(), createdAt: new Date().toISOString(), type: "straight", stake: 20, book: "BetMGM", legs: [linked(pre2, "total", "under", totalOf(pre2), -108)] });
   if (live3) bets.push({ id: uid(), createdAt: new Date(Date.now() - 2400e3).toISOString(), type: "straight", stake: 25, ghost: true, legs: [linked(live3, "spread", "home", spreadOf(live3, "home"), -110)] });
+  // Player props: one tied to its game, and a parlay that names no team (found via box scores).
+  const ros = (t) => src().demoRoster?.(t.id, t.league);
+  if (live1 && ros(live1.away)) {
+    const qb = ros(live1.away).QB.name;
+    bets.push({ id: uid(), createdAt: new Date(Date.now() - 3000e3).toISOString(), type: "straight", stake: 20, book: "DraftKings", legs: [
+      { id: uid(), pick: `${qb} Over 224.5 Passing Yards`, odds: americanToDecimal(-115), status: "open", gameId: live1.id, sport: live1.sport, gameLabel: live1.shortName, kickoff: live1.date },
+    ] });
+  }
+  if (live2 && ros(live2.home)) {
+    bets.push({ id: uid(), createdAt: new Date(Date.now() - 2000e3).toISOString(), type: "parlay", stake: 10, book: "FanDuel", legs: [
+      { id: uid(), pick: `${ros(live2.home).RB.name} anytime TD`, odds: americanToDecimal(-140), status: "open" },
+      { id: uid(), pick: `${ros(live2.away).WR1.name} 5+ Receptions`, odds: americanToDecimal(-120), status: "open" },
+    ] });
+  }
   bets.push({ id: uid(), createdAt: new Date().toISOString(), type: "parlay", stake: 5, book: "FanDuel", boostPct: 25, legs: [
     { id: uid(), pick: "Heisman: Arch Manning", odds: americanToDecimal(900), status: "open" },
     { id: uid(), pick: "Texas to make CFP", odds: americanToDecimal(-250), status: "open" },

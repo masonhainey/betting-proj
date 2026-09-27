@@ -90,7 +90,7 @@ export function sanitizeShare(raw) {
     const leg = { pick, odds, status: STATUSES.has(l.s) ? l.s : "open" };
     if (typeof l.g === "string" && /^\d{1,14}$/.test(l.g)) leg.gameId = l.g;
     if (leg.gameId) leg.sport = l.sp === "nfl" ? "nfl" : "cfb";
-    if (MARKETS.has(l.m)) leg.market = l.m;
+    if (MARKETS.has(l.m) && l.m !== "prop") leg.market = l.m; // props are re-read from the pick text
     if (SIDES.has(l.d)) leg.side = l.d;
     const line = num(l.n, -200, 400);
     if (line !== undefined) leg.line = line;

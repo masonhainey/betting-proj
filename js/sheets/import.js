@@ -1,5 +1,6 @@
 // Importing slips from screenshots, share text and links.
 
+import { parseProp } from "../props.js";
 import { formatOdds, fmtMoney } from "../odds.js";
 import { parseSlipText, linkPick, readScore } from "../slipparse.js";
 import { readImage } from "../ocr.js";
@@ -78,7 +79,8 @@ export function importPreview() {
   const rows = p.legs.map((l) => {
     const m = linkPick(l.pick, pool, l.context);
     const g = m && game(m.gameId);
-    return `<div class="ip-leg"><span class="ldot"></span><div class="lmain"><div class="lpick">${esc(l.pick)}${l.uncertain ? `<span class="chk" title="The +/- sign didn't come through. Check this price.">check ±</span>` : l.solved ? `<span class="chk ok" title="The +/- sign was missing; recovered by matching your ticket's payout">sign fixed</span>` : ""}</div>${g ? `<div class="lmeta">${logo(g.away, 16)}${logo(g.home, 16)} ${esc(g.shortName)} · ${esc(relDay(g.date))}${m.market !== "other" ? " · tracks live" : ""}</div>` : `<div class="lmeta">No game match: it'll be tracked manually</div>`}</div><span class="lodds">${odds(l.odds)}</span></div>`;
+    const prop = parseProp(l.pick);
+    return `<div class="ip-leg"><span class="ldot"></span><div class="lmain"><div class="lpick">${esc(l.pick)}${l.uncertain ? `<span class="chk" title="The +/- sign didn't come through. Check this price.">check ±</span>` : l.solved ? `<span class="chk ok" title="The +/- sign was missing; recovered by matching your ticket's payout">sign fixed</span>` : ""}</div>${g ? `<div class="lmeta">${logo(g.away, 16)}${logo(g.home, 16)} ${esc(g.shortName)} · ${esc(relDay(g.date))}${m.market !== "other" || prop ? " · tracks live" : ""}</div>` : prop ? `<div class="lmeta">Player prop: ${esc(prop.player)} · found in the box score once games start</div>` : `<div class="lmeta">No game match: it'll be tracked manually</div>`}</div><span class="lodds">${odds(l.odds)}</span></div>`;
   }).join("");
   return `<div class="ip-sum">
       ${p.book ? `<span class="pill open">${esc(p.book)}</span>` : ""}

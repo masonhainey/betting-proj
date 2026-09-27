@@ -1,5 +1,6 @@
 // Bets tab: P/L hero, sweat cards, bet cards, insights.
 
+import { propMargin } from "../props.js";
 import { fmtMoney, fmtPct } from "../odds.js";
 import { betStatus, betProfit, ticketDecimal, potentialPayout, legLive, legLabel, summarize, breakdown } from "../grade.js";
 import * as cloud from "../cloud.js";
@@ -120,6 +121,18 @@ export function sweatCard(b) {
   </button>`;
 }
 
+/** How close a prop is to its line: a bar that fills as the stat climbs. */
+export function propBar(l, g) {
+  if (l.market !== "prop" || l.status !== "open" || !l.prop || l.prop.side === "yes" || !g || g.state === "pre") return "";
+  const r = propMargin(l, g);
+  if (!r) return "";
+  const target = l.prop.side === "yes" ? 1 : Math.ceil(l.prop.line + 0.01);
+  const scale = Math.max(target, r.value, 1);
+  const pct = Math.max(0, Math.min(100, (r.value / scale) * 100));
+  const cls = l.prop.side === "under" ? (r.margin > 0 ? (pct > 80 ? "warn" : "ok") : "bad") : r.margin > 0 ? "ok" : "go";
+  return `<div class="pbar ${cls}" title="${esc(`${r.value} of ${target}`)}"><i style="width:${pct.toFixed(1)}%"></i><b style="left:${Math.min(100, (Math.min(l.prop.line, target) / scale) * 100).toFixed(1)}%"></b></div>`;
+}
+
 export function betCard(b) {
   const st = betStatus(b);
   const d = ticketDecimal(b);
@@ -138,7 +151,7 @@ export function betCard(b) {
         : "";
     return `<div class="leg ${lv.state}">
       <span class="ldot"></span>
-      <div class="lmain"><div class="lpick">${esc(legLabel(l, g))}${l.autoGraded ? `<span class="auto" title="Graded automatically from the final score">auto</span>` : ""}</div>${meta ? `<div class="lmeta">${meta}</div>` : ""}</div>
+      <div class="lmain"><div class="lpick">${esc(legLabel(l, g))}${l.market === "prop" ? `<span class="auto prop" title="Player prop: tracked from the box score">prop</span>` : ""}${l.autoGraded ? `<span class="auto" title="Graded automatically from the ${l.market === "prop" ? "box score" : "final score"}">auto</span>` : ""}</div>${meta ? `<div class="lmeta">${meta}</div>` : ""}${propBar(l, g)}</div>
       ${isParlay ? `<span class="lodds">${odds(l.odds)}</span>` : ""}
     </div>`;
   }).join("");

@@ -1,6 +1,7 @@
 // Add-a-pick form.
 
 import { relinkLegs } from "../relink.js";
+import { STATS, parseProp } from "../props.js";
 import { americanToDecimal, parseOdds, formatOdds, parlayDecimal, toWin, stakeForWin, impliedProb, fmtMoney, fmtPct, fmtLine } from "../odds.js";
 import { uid } from "../store.js";
 import { esc, fmtTime, relDay, logo, icons } from "../ui.js";
@@ -61,6 +62,14 @@ export function formCalc() {
   return { legs, valid: valid || ticket > 0, calc, d, stake, win: toWin(stake, d), payout: stake * d, calcPayout: valid ? stake * dCalc : 0, ticket, prob: impliedProb(d) };
 }
 
+/** Shown under a pick that reads as a player prop, so you know it'll track itself. */
+export function propHint(pick) {
+  const p = parseProp(pick);
+  if (!p) return "";
+  const what = p.side === "yes" ? "Anytime TD" : `${STATS[p.stat].label} · ${p.side === "over" ? "Over" : "Under"} ${p.line}`;
+  return `<span class="badge prop">Player prop</span> <b>${esc(p.player)}</b> · ${esc(what)} <span class="muted">· tracks live from the box score</span>`;
+}
+
 export function sheetAdd() {
   const f = S.form;
   const c = formCalc();
@@ -69,10 +78,11 @@ export function sheetAdd() {
     const g = game(l.gameId);
     return `<div class="fleg">
       ${f.type === "parlay" ? `<div class="fl-h"><span>Leg ${i + 1}</span>${legs.length > 2 ? `<button class="link" data-act="form-rm-leg" data-id="${l.id}">Remove</button>` : ""}</div>` : ""}
-      <label class="field"><span>Pick</span><input id="f-pick-${l.id}" data-in="f-pick" data-id="${l.id}" placeholder="${i ? "e.g. Over 48.5" : "e.g. Georgia -7.5, Texas ML, Over 52.5"}" value="${esc(l.pick)}" autocomplete="off"></label>
+      <label class="field"><span>Pick</span><input id="f-pick-${l.id}" data-in="f-pick" data-id="${l.id}" placeholder="${i ? "e.g. Over 48.5" : "e.g. Georgia -7.5, Texas ML, Josh Allen o250.5 pass yds"}" value="${esc(l.pick)}" autocomplete="off"></label>
+      <div class="prop-hint" id="f-prop-${l.id}">${propHint(l.pick)}</div>
       <div class="field ${l.uncertain ? "unsure" : ""}"><span>Odds <small>${l.uncertain ? "the +/- sign didn't come through. Check it against your slip" : "type +150, -110, 2.5, x9.3 or 5/2"}</small></span>${stepper(`f-odds-${l.id}`, l.oddsText, "f-odds", l.id)}</div>
       ${g
-        ? `<div class="linked">${logo(g.away, 18)}${logo(g.home, 18)}<span>Tracking <b>${esc(g.shortName)}</b> · ${esc(relDay(g.date))} ${esc(fmtTime(g.date))}${l.market && l.market !== "other" ? " · auto-grades" : ""}</span><button class="link" data-act="form-unlink" data-id="${l.id}">Unlink</button></div>`
+        ? `<div class="linked">${logo(g.away, 18)}${logo(g.home, 18)}<span>Tracking <b>${esc(g.shortName)}</b> · ${esc(relDay(g.date))} ${esc(fmtTime(g.date))}${(l.market && l.market !== "other") || parseProp(l.pick) ? " · auto-grades" : ""}</span><button class="link" data-act="form-unlink" data-id="${l.id}">Unlink</button></div>`
         : f.linking === l.id ? linkPicker(l) : `<button class="link" data-act="form-link" data-id="${l.id}">${icons.live} Link a game for live tracking & auto-grading</button>`}
     </div>`;
   }).join("");

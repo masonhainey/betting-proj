@@ -4,8 +4,12 @@
 
 import { betStatus } from "./grade.js";
 import { PROPISH, linkPick } from "./slipparse.js";
+import { parseProp } from "./props.js";
 
 const GRADEABLE = new Set(["ml", "spread", "total"]);
+
+/** An open leg whose text reads as a player prop we can track, not yet set up as one. */
+export const newProp = (leg) => leg.status === "open" && (leg.market !== "prop" || !leg.prop) && !!parseProp(leg.pick);
 
 export const needsLink = (leg) => leg.status === "open" && !PROPISH.test(leg.pick || "") && (!leg.gameId || !GRADEABLE.has(leg.market));
 
@@ -19,8 +23,27 @@ export function relinkLegs(bets, games) {
   for (const bet of bets) {
     if (betStatus(bet) !== "open" || !Array.isArray(bet.legs)) continue;
     for (const leg of bet.legs) {
-      if (!needsLink(leg)) continue;
       const placed = Date.parse(bet.createdAt) || Date.now();
+      if (newProp(leg)) {
+        // Player props: find the game from a team in the text or the slip's matchup line. If
+        // neither names one, the app looks for the player in box scores once games start.
+        leg.market = "prop";
+        leg.prop = parseProp(leg.pick);
+        delete leg.side;
+        delete leg.line;
+        if (!leg.gameId) {
+          const pool = games.filter((g) => {
+            const t = Date.parse(g.date);
+            return t >= placed - 12 * 3600e3 && t <= placed + 14 * 864e5;
+          });
+          const m = pool.length ? linkPick(leg.pick, pool, leg.gameLabel || "", Date.parse(leg.kickoff) || placed) : null;
+          const g = m && pool.find((x) => x.id === m.gameId);
+          if (g) Object.assign(leg, { gameId: g.id, sport: g.sport || "cfb", gameLabel: g.shortName, kickoff: g.date, autoLinked: true });
+        }
+        changed.push({ bet, leg });
+        continue;
+      }
+      if (!needsLink(leg)) continue;
       const pool = leg.gameId
         ? games.filter((g) => g.id === leg.gameId)
         : games.filter((g) => {

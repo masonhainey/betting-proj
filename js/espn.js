@@ -1,6 +1,8 @@
 // ESPN's public site API. It serves CORS headers, so the browser calls it directly —
 // no relay to break. Every response gets normalized into one flat Game shape.
 
+import { parseBox } from "./props.js";
+
 const ROOT = "https://site.api.espn.com/apis/site/v2/sports/football";
 
 /** The leagues hedgehog follows. Every game and every linked leg carries one of these keys. */
@@ -81,6 +83,12 @@ export async function fetchRange(start, days, opts) {
   const failedDays = results.flatMap((r) => r.failed);
   if (!byId.size && failedDays.length) throw new Error("Schedule feed unreachable");
   return { games: [...byId.values()], failedDays };
+}
+
+/** Player box score for one game (the feed behind ESPN's Gamecast). */
+export async function fetchBox(id, { sport = "cfb" } = {}) {
+  const data = await getJSON(`${ROOT}/${sportOf(sport).path}/summary?event=${encodeURIComponent(id)}`);
+  return parseBox(data);
 }
 
 export async function fetchNews({ sport = "cfb", limit = 40 } = {}) {

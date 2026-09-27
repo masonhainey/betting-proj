@@ -5,9 +5,10 @@
 //        oddsOverride?: decimal, boostPct?: number, cashout?: number, settledAt? }
 // Leg  { id, pick, odds (decimal), status: 'open'|'won'|'lost'|'push'|'void',
 //        gameId?, market?: 'ml'|'spread'|'total'|'prop'|'other', side?: 'home'|'away'|'over'|'under',
-//        line?: number, gameLabel?, kickoff?, autoGraded? }
+//        line?: number, gameLabel?, kickoff?, autoGraded?, sport?, prop?: { player, stat, side, line } }
 
 import { parlayDecimal } from "./odds.js";
+import { propMargin } from "./props.js";
 
 export const SETTLED = new Set(["won", "lost", "push", "void", "cashout"]);
 
@@ -84,6 +85,7 @@ function scores(game) {
  * <0 losing, 0 push, plus a human sentence. null if the leg can't be auto-tracked.
  */
 export function legMargin(leg, game) {
+  if (leg.market === "prop") return propMargin(leg, game);
   if (!game || !leg.market || !["ml", "spread", "total"].includes(leg.market)) return null;
   const sc = scores(game);
   if (!sc) return null;
@@ -110,6 +112,7 @@ function totalText(leg, sum, m) {
 /** Final grade for a leg once its game is over, or null if not gradeable yet. */
 export function gradeLeg(leg, game) {
   if (!game || game.state !== "post" || !game.completed) return null;
+  if (leg.market === "prop" && !game.box?.final) return null; // wait for the final box score
   const r = legMargin(leg, game);
   if (!r) return null;
   return r.margin > 0 ? "won" : r.margin < 0 ? "lost" : "push";
@@ -121,7 +124,9 @@ export function legLive(leg, game) {
   if (!game) return { state: "pending", text: "" };
   if (game.state === "pre") return { state: "pending", text: "" };
   const r = legMargin(leg, game);
-  if (!r) return { state: game.state === "in" ? "live" : "pending", text: "" };
+  if (!r) return { state: game.state === "in" ? "live" : "pending", text: leg.market === "prop" && game.box && !r ? "Player not in the box score yet" : "" };
+  // An over (or anytime TD) that hasn't cashed yet is still live, not losing.
+  if (leg.market === "prop" && game.state === "in" && r.margin <= 0 && leg.prop?.side !== "under") return { state: "live", text: r.text };
   return { state: r.margin > 0 ? "winning" : r.margin < 0 ? "losing" : "even", text: r.text };
 }
 
