@@ -122,9 +122,9 @@ function slateFor(date, sport = "cfb") {
 function scoringPlays(seed, hr, ar) {
   const r = rng(seed);
   const plays = [];
-  for (let m = 4; m < 60; m += 3 + r() * 5) {
+  for (let m = 3; m < 60; m += 2 + r() * 3) {
     const edge = (hr + 3 - ar) / 60;
-    if (r() < 0.42) plays.push({ m, home: r() < 0.5 + edge, pts: r() < 0.7 ? 7 : 3 });
+    if (r() < 0.45) plays.push({ m, home: r() < 0.5 + edge, pts: r() < 0.7 ? 7 : 3 });
   }
   return plays;
 }
@@ -159,7 +159,7 @@ function eventFor(g) {
   const drift = g.seed % 4 === 0 ? Math.floor((now - T0) / 300000) * 0.5 * (g.seed % 8 === 0 ? 1 : -1) : 0;
   const rawSpread = -(hr - ar + 2.5) + drift;
   const spread = Math.round(rawSpread * 2) / 2 || -1;
-  const total = Math.round((44 + r() * 20) * 2) / 2;
+  const total = Math.round((38 + r() * 13) * 2) / 2; // matches what demo games actually score (~45)
   const ml = spreadToMl(spread);
   const newShape = g.seed % 2 === 0;
   const details = spread < 0 ? `${habbr} ${spread}` : `${aabbr} ${-spread}`;

@@ -1,5 +1,6 @@
 // Bets tab: P/L hero, sweat cards, bet cards, insights.
 
+import { leaksCard } from "./modelui.js";
 import { propMargin } from "../props.js";
 import { fmtMoney, fmtPct } from "../odds.js";
 import { betStatus, betProfit, ticketDecimal, potentialPayout, legLive, legLabel, summarize, breakdown } from "../grade.js";
@@ -190,7 +191,8 @@ export function insightsHtml() {
   const s = summarize(bets);
   const avgOdds = bets.length ? bets.reduce((a, b) => a + ticketDecimal(b), 0) / bets.length : NaN;
   const be = Number.isFinite(avgOdds) ? 1 / avgOdds : NaN;
-  return `<div class="ins-grid">
+  return `<div class="card ins leaks-card">${leaksCard(bets)}</div>
+  <div class="ins-grid">
     <div class="card ins kpis">
       <div><span>Avg odds</span><b>${odds(avgOdds)}</b></div>
       <div><span>Break-even rate</span><b>${fmtPct(be)}</b></div>

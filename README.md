@@ -76,6 +76,32 @@ A lost parlay's detail view also names the leg or legs that sank it.
 
 **Ticket payout.** Books don't always pay exactly what the leg odds multiply to. They round each leg's price, price same-game parlays with their own correlation math, and prices can move between building a slip and placing it. Enter the payout printed on your ticket, either when adding the bet or later from the bet's detail view. hedgehog will use that number and show how far off the leg math was.
 
+## hedgehog model
+
+**Ratings:** power ratings for every team, college and NFL, built from last season and this one. Game results come from ESPN's scoreboard and are cached on the device after the first load. The ratings account for:
+- margin of victory, with blowouts counted less past a cap
+- strength of opponent and home field
+- recent games weighted more
+- last season as the starting point
+- separate offense and defense ratings for totals
+
+**Board:** each game shows the model's fair spread, win chance and total. Prices where the model disagrees with the book get a small tag with the edge in percentage points. A tag is purple (a "lean") until the model has proven itself. It turns green ("value") only once the report card shows the model beating the closing line.
+
+**Model check (in the slip):** for every leg, the model's hit chance next to what the price implies. It also shows the parlay's real chance of hitting, its fair price and expected value, and a better-value swap in the same game if one exists.
+
+**Model parlay (2/3/4 legs):** the board's best-value legs, one per game and one per team. It only uses legs the model thinks are more likely than not to hit.
+
+**Report card:** each season is replayed week by week, and every game is predicted using only earlier games. It shows:
+- how often the model picks the winner
+- its average miss on the margin, next to the market's
+- spread and total records against the closing line
+
+"Value" tags need 53.5%+ on 60+ strong disagreements. The blend between model and market uses the mix that tested best.
+
+**Where your money goes (Bets → Insights):** your settled bets broken down by structure, market and price. It shows wins compared with what the prices implied, parlays lost by a single leg, and roughly how much house edge you've paid, with plain-English takeaways.
+
+The model only claims edges where it's more reliable. It shows no edges on long shots under 30%, none on moneylines in games with lines over 10 points, and none on huge spreads.
+
 ## Player props
 
 Type or import a prop the way books write it:

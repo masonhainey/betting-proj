@@ -9,6 +9,7 @@ import { slipCalc } from "./market.js";
 import { sheetAdd } from "./sheets/add.js";
 import { sheetBet } from "./sheets/bet.js";
 import { sheetGame } from "./sheets/game.js";
+import { sheetModel } from "./views/modelui.js";
 import { sheetImport } from "./sheets/import.js";
 import { sheetSettings } from "./sheets/settings.js";
 import { $, $$, fmt, odds, S, settings, sport, swap } from "./state.js";
@@ -46,7 +47,7 @@ export function renderSheet() {
   // Forms render once and update in place; live sheets re-render every refresh.
   if (root.dataset.kind === k && root.dataset.key === (S.sheet.id || "") && ["add", "settings", "import", "share", "group", "groupnew", "join"].includes(k) && !S.sheet.dirty) return;
   S.sheet.dirty = false;
-  const body = { add: sheetAdd, bet: sheetBet, game: sheetGame, settings: sheetSettings, import: sheetImport, share: sheetShare, tail: sheetTail, member: sheetMember, group: sheetGroup, groupnew: sheetGroupNew, join: sheetJoin, slip: () => `<div class="sheet-h"><h2>Bet slip</h2>${closeBtn()}</div>${slipHtml()}` }[k]();
+  const body = { add: sheetAdd, bet: sheetBet, game: sheetGame, model: sheetModel, settings: sheetSettings, import: sheetImport, share: sheetShare, tail: sheetTail, member: sheetMember, group: sheetGroup, groupnew: sheetGroupNew, join: sheetJoin, slip: () => `<div class="sheet-h"><h2>Bet slip</h2>${closeBtn()}</div>${slipHtml()}` }[k]();
   root.dataset.kind = k;
   root.dataset.key = S.sheet.id || "";
   if (root.hidden) {
@@ -152,12 +153,12 @@ export function lineSummary(g) {
   return parts.join(" · ");
 }
 
-export function selBtn(s, label, { compact = false } = {}) {
+export function selBtn(s, label, { compact = false, extra = "" } = {}) {
   if (!s) return `<button class="sel na" disabled>—</button>`;
   const on = S.slip.legs.some((l) => l.key === s.key);
   const mv = S.moves[s.key];
   return `<button class="sel ${on ? "on" : ""} ${mv ? `mv-${mv.dir}` : ""}" data-act="toggle-sel" data-key="${esc(s.key)}" aria-pressed="${on}">
-    ${label ? `<span class="ln">${label}</span>` : ""}<span class="pr">${odds(s.odds)}${mv ? `<i class="arrow">${mv.dir === "up" ? "▲" : "▼"}</i>` : ""}</span>
+    ${label ? `<span class="ln">${label}</span>` : ""}<span class="pr">${odds(s.odds)}${mv ? `<i class="arrow">${mv.dir === "up" ? "▲" : "▼"}</i>` : ""}</span>${extra}
   </button>`;
 }
 

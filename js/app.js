@@ -9,6 +9,7 @@ import { CLOUD, syncNow } from "./account.js";
 import { loadCache, tick } from "./data.js";
 import { handleAuthLink } from "./events.js";
 import { render } from "./render.js";
+import { onModel } from "./model/index.js";
 import { $, BOOKS, S, TABS } from "./state.js";
 
 // ───────────────────────────── boot ─────────────────────────────
@@ -32,6 +33,7 @@ function boot() {
   }
   if (alertsOn() && cloud.currentUser()) subscribePush();
   tick(true);
+  onModel(() => render()); // the model finished training: show its numbers
   setInterval(tick, 5000);
   // Installed-app support (Add to Home Screen): offline shell + faster launches.
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {

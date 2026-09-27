@@ -6,11 +6,14 @@ import { esc, fmtTime, dayKey, relDay, logo, rank, icons } from "../ui.js";
 
 import { boardGames, markets, selByKey, slipCalc } from "../market.js";
 import { chip, fmtToggle, selBtn, skeleton } from "../render.js";
-import { S, SP, fmt, game, num, odds, settings } from "../state.js";
+import { S, SP, fmt, game, num, odds, settings, sport } from "../state.js";
+import { edgeTag, modelBar, modelLine, slipCheck } from "./modelui.js";
+import { ensureModel } from "../model/index.js";
 
 // ── Build ──
 
 export function viewBuild() {
+  ensureModel(sport());
   const all = boardGames();
   const days = [...new Set(all.map((g) => dayKey(g.date)))];
   const dayF = S.f.buildDay === "all" || days.includes(S.f.buildDay) ? S.f.buildDay : "all";
@@ -37,11 +40,14 @@ export function viewBuild() {
       </div>
       <div class="chips scroll">${chip("All", "build-day", "all", dayF === "all")}${days.map((d) => chip(esc(relDay(d + "T12:00:00")), "build-day", d, dayF === d)).join("")}</div>
       ${S.sim ? `<div class="notice sim"><span class="dot live"></span><span><b>Market sim on.</b> Prices are drifting on purpose so you can watch the slip reprice. Turn it off to snap back to the real lines.</span></div>` : ""}
+      ${modelBar()}
       ${board}
     </div>
     <aside class="build-slip card">${S.sheet?.kind === "slip" ? "" : slipHtml()}</aside>
   </div>`;
 }
+
+const sb = (s, label, g) => selBtn(s, label, { extra: edgeTag(s, g) });
 
 export function boardRow(g) {
   const m = markets(g);
@@ -50,10 +56,11 @@ export function boardRow(g) {
       <span class="btime">${esc(relDay(g.date))} · ${g.timeValid ? esc(fmtTime(g.date)) : "TBD"}${g.tv ? ` · ${esc(g.tv)}` : ""}${g.home.rank && g.away.rank ? ` · <span class="rk-inline">★ Ranked</span>` : ""}</span>
       <span class="bt">${logo(g.away, 20)}${rank(g.away)}${esc(g.away.short)}</span>
       <span class="bt">${logo(g.home, 20)}${rank(g.home)}${esc(g.home.short)}</span>
+      ${modelLine(g)}
     </button>
-    <div class="bcol">${selBtn(m.spreadAway, fmtLine(m.spreadAway?.line))}${selBtn(m.spreadHome, fmtLine(m.spreadHome?.line))}</div>
-    <div class="bcol">${selBtn(m.over, m.over ? `O ${m.over.line}` : "")}${selBtn(m.under, m.under ? `U ${m.under.line}` : "")}</div>
-    <div class="bcol">${selBtn(m.mlAway, "")}${selBtn(m.mlHome, "")}</div>
+    <div class="bcol">${sb(m.spreadAway, fmtLine(m.spreadAway?.line), g)}${sb(m.spreadHome, fmtLine(m.spreadHome?.line), g)}</div>
+    <div class="bcol">${sb(m.over, m.over ? `O ${m.over.line}` : "", g)}${sb(m.under, m.under ? `U ${m.under.line}` : "", g)}</div>
+    <div class="bcol">${sb(m.mlAway, "", g)}${sb(m.mlHome, "", g)}</div>
   </div>`;
 }
 
@@ -115,6 +122,7 @@ export function slipHtml() {
     <div class="slegs">${legs}</div>
     <button class="btn sm ghost add-custom" data-act="slip-custom">+ Custom selection</button>
     ${warn}
+    ${slipCheck(c, mode)}
     ${parlayBox}
     <div id="slip-summary">${slipSummary(c)}</div>
     <label class="bookf"><span>Book</span><input id="slip-book" data-in="slip-book" list="books" placeholder="Where you're placing it" value="${esc(S.slip.book || "")}"></label>
