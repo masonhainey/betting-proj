@@ -1,6 +1,8 @@
 // Draws a shareable ticket image (1080×1350, 4:5 — fits iMessage and group chats) on a
 // canvas. Browser only.
 
+import { drawLogo } from "./brand.js";
+
 const W = 1080, H = 1350, PAD = 84;
 const C = {
   bg: "#09080c", card: "#141119", line: "#2a2535", text: "#f3f1f8", muted: "#9b96aa",
@@ -51,12 +53,7 @@ export async function drawShareCard(card) {
   ctx.fillRect(0, 0, W, H);
 
   // Brand.
-  ctx.save();
-  ctx.translate(PAD, 84);
-  ctx.scale(2.1, 2.1);
-  ctx.fillStyle = C.accent;
-  ctx.fill(new Path2D("M1 25l4-9 3 4 4-12 4 8 4-14 4 11 4-7 3 7 6 12z"));
-  ctx.restore();
+  drawLogo(ctx, PAD, 80, 72);
   ctx.fillStyle = C.text;
   ctx.font = `900 54px ${FONT}`;
   ctx.fillText("hedgehog", PAD + 96, 136);

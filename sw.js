@@ -1,13 +1,13 @@
 // Offline shell for the installed app. Network-first (and revalidated) for our own files
 // so updates show up on the next launch; the cache only answers when there's no connection. ESPN, fonts and
 // the OCR library always go straight to the network.
-const CACHE = "hedgehog-v21";
+const CACHE = "hedgehog-v22";
 const SHELL = [
   "./", "index.html", "styles.css", "manifest.webmanifest", "js/account.js", "js/autopsy.js", "js/app.js",
   "js/cloud.js", "js/config.js", "js/data.js", "js/demo.js", "js/espn.js", "js/events.js",
   "js/grade.js", "js/market.js", "js/news.js", "js/ocr.js", "js/odds.js", "js/render.js",
   "js/sheets/add.js", "js/sheets/bet.js", "js/sheets/game.js", "js/sheets/import.js",
-  "js/sheets/settings.js", "js/alerts.js", "js/alertrules.js", "js/friends.js", "js/leaderboard.js", "js/views/friends.js", "js/sheets/share.js", "js/share.js", "js/sharecard.js", "js/slipparse.js", "js/state.js", "js/store.js", "js/sync.js", "js/widget.js", "js/relink.js", "js/field.js", "js/fieldview.js", "js/props.js", "js/summary.js", "js/leaks.js", "js/views/leaks.js",
+  "js/sheets/settings.js", "js/alerts.js", "js/alertrules.js", "js/friends.js", "js/leaderboard.js", "js/views/friends.js", "js/sheets/share.js", "js/share.js", "js/sharecard.js", "js/slipparse.js", "js/state.js", "js/store.js", "js/sync.js", "js/widget.js", "js/relink.js", "js/field.js", "js/fieldview.js", "js/props.js", "js/summary.js", "js/leaks.js", "js/brand.js", "js/views/leaks.js",
   "js/ui.js", "js/views/bets.js", "js/views/build.js", "js/views/live.js", "js/views/news.js",
   "js/views/schedule.js", "icons/icon-192.png", "icons/apple-touch-icon.png",
 ];
