@@ -1,6 +1,6 @@
 // Bets tab: P/L hero, sweat cards, bet cards, insights.
 
-import { leaksCard } from "./modelui.js";
+import { leaksCard } from "./leaks.js";
 import { propMargin } from "../props.js";
 import { fmtMoney, fmtPct } from "../odds.js";
 import { betStatus, betProfit, ticketDecimal, potentialPayout, legLive, legLabel, summarize, breakdown } from "../grade.js";

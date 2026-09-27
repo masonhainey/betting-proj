@@ -1,9 +1,9 @@
 // Where your money goes: your settled bets broken down by structure, market and price,
 // compared with what those prices implied, plus plain-English takeaways. Pure — tested.
 
-import { betStatus, betProfit, ticketDecimal } from "../grade.js";
-import { marketName } from "../autopsy.js";
-import { fmtMoney } from "../odds.js";
+import { betStatus, betProfit, ticketDecimal } from "./grade.js";
+import { marketName } from "./autopsy.js";
+import { fmtMoney } from "./odds.js";
 
 const HOLD = 0.045; // typical house edge per leg at standard prices
 

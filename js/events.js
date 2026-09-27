@@ -13,14 +13,12 @@ import * as cloud from "./cloud.js";
 import { load, uid } from "./store.js";
 import { CLOUD, acct, acctSubmit, paintAcct, syncNow } from "./account.js";
 import { refreshDetail, refreshNews, refreshSchedule, refreshToday, switchSport, tick } from "./data.js";
-import { boardGames, selByKey, setSim, slipCalc, slipLegFromSel, toggleSel, trackSlip } from "./market.js";
-import { modelParlay } from "./views/modelui.js";
-import { retryModel } from "./model/index.js";
+import { selByKey, setSim, slipCalc, slipLegFromSel, toggleSel, trackSlip } from "./market.js";
 import { openSheet, paintDock, render } from "./render.js";
 import { formCalc, newFormLeg, openAdd, paintForm, propHint, saveForm } from "./sheets/add.js";
 import { hedgeText } from "./sheets/bet.js";
 import { handleImage, handleText, importPreview, openDraft } from "./sheets/import.js";
-import { $, $$, NS, S, TABS, fmt, game, num, odds, saveBets, saveSettings, saveSlip, settings, sport, toast } from "./state.js";
+import { $, $$, NS, S, TABS, fmt, game, num, odds, saveBets, saveSettings, saveSlip, settings, toast } from "./state.js";
 import { slipSummary, towinText } from "./views/build.js";
 
 // ───────────────────────────── events ─────────────────────────────
@@ -435,30 +433,6 @@ export const actions = {
     paintAlerts();
   },
   sport: (el) => switchSport(el.dataset.v),
-  "model-card": () => openSheet({ kind: "model" }),
-  "model-retry": () => {
-    retryModel(sport());
-    render();
-  },
-  "model-parlay": (el) => {
-    const picks = modelParlay(boardGames(), Number(el.dataset.v) || 3);
-    if (picks.length < 2) return toast("The model doesn't see enough value on the board for a parlay right now", "err");
-    S.slip.legs = picks.map((p) => slipLegFromSel(selByKey(p.key)));
-    S.slip.mode = "parlay";
-    S.slip.modeTouched = true;
-    saveSlip();
-    toast(`Model parlay: ${picks.length} legs with the biggest edges${picks.length < Number(el.dataset.v) ? ` (only ${picks.length} qualified)` : ""}`);
-    if (S.sheet?.kind !== "slip" && window.innerWidth < 860) openSheet({ kind: "slip" });
-    render();
-  },
-  "model-swap": (el) => {
-    const i = S.slip.legs.findIndex((l) => l.id === el.dataset.from);
-    const s = selByKey(el.dataset.key);
-    if (i < 0 || !s) return;
-    S.slip.legs[i] = slipLegFromSel(s);
-    saveSlip();
-    render();
-  },
   "widget-copy": async () => {
     const site = location.origin + location.pathname.replace(/[^/]*$/, "");
     const ok = await copy(installerCode(site));
