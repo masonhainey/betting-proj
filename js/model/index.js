@@ -4,6 +4,7 @@
 
 import { load, save } from "../store.js";
 import { NS, src } from "../state.js";
+import { ymd } from "../espn.js";
 import { fitRatings, predict } from "./ratings.js";
 import { backtest, combine } from "./backtest.js";
 import { view, WEIGHT } from "./edge.js";
@@ -27,28 +28,60 @@ const compact = (g) => ({
   ...(g.odds?.total?.line != null ? { tot: g.odds.total.line } : {}),
 });
 
-/** One season's finished games, from cache when possible. */
+const WEEK = 7 * 864e5;
+const progress = {}; // sport → { done, total }
+export const modelProgress = (sport) => progress[sport];
+
+/** Run jobs a few at a time (ESPN doesn't like 50 big requests at once). */
+async function pool(items, n, fn) {
+  const queue = [...items];
+  await Promise.all(Array.from({ length: Math.min(n, queue.length) }, async () => {
+    while (queue.length) await fn(queue.shift());
+  }));
+}
+
+/**
+ * One season's finished games. Fetched a week at a time, three weeks in parallel, and saved
+ * after every week, so a slow connection or a failed week never loses what already loaded.
+ * Recent weeks of the current season are refreshed (scores and closing lines settle).
+ */
 async function season(sport, year, current) {
   const key = `${NS}model.${sport}.${year}`;
-  const c = load(key, null);
-  if (c?.complete) return c.games;
-  if (c && current && Date.now() - (c.at || 0) < 6 * 3600e3) return c.games;
+  const c = load(key, null) || { games: [], done: [] };
+  c.done ||= [];
+  if (c.complete) return { games: c.games, failed: 0 };
   const { start, end } = seasonWindow(sport, year);
   const today = new Date();
-  const from = c?.through ? new Date(Math.max(start, Date.parse(c.through) - 3 * 864e5)) : start;
-  const to = new Date(Math.min(end, today));
-  let games = c?.games || [];
-  if (from < to) {
-    const days = Math.ceil((to - from) / 864e5) + 1;
-    const { games: got } = await src().fetchRange(from, days, { sport });
-    const byId = new Map(games.map((g) => [g.id, g]));
-    for (const g of got) if (g.state === "post" && g.completed && Number.isFinite(g.home.score)) byId.set(g.id, compact(g));
-    games = [...byId.values()];
-  }
-  try {
-    save(key, { games, through: to.toISOString(), at: Date.now(), complete: !current && today > end });
-  } catch {} // storage full: works this session, refetches next time
-  return games;
+  const last = Math.min(end.getTime(), today.getTime());
+  const recent = today.getTime() - 10 * 864e5;
+  const weeks = [];
+  for (let t = start.getTime(); t <= last; t += WEEK) weeks.push(t);
+  const fresh = current && Date.now() - (c.at || 0) < 6 * 3600e3;
+  const todo = weeks.filter((t) => !c.done.includes(ymd(new Date(t))) && !(fresh && t + WEEK > recent));
+  const byId = new Map(c.games.map((g) => [g.id, g]));
+  let failed = 0;
+  const p = (progress[sport] ||= { done: 0, total: 0 });
+  p.total += todo.length;
+  const persist = () => {
+    try {
+      save(key, { games: [...byId.values()], done: c.done, at: Date.now(), complete: !current && today > end && c.done.length >= weeks.length });
+    } catch {} // storage full: still works this session
+  };
+  await pool(todo, 3, async (t) => {
+    const a = new Date(t), b = new Date(Math.min(t + 6 * 864e5, last));
+    try {
+      const got = await src().fetchScoreboard(`${ymd(a)}-${ymd(b)}`, { sport, timeout: 30000 });
+      for (const g of got) if (g.state === "post" && g.completed && Number.isFinite(g.home.score)) byId.set(g.id, compact(g));
+      if (b.getTime() < recent) c.done.push(ymd(a));
+      persist();
+    } catch {
+      failed++;
+    }
+    p.done++;
+    for (const fn of listeners) fn(sport, "progress");
+  });
+  if (current) persist();
+  return { games: [...byId.values()], failed };
 }
 
 /** Load (or refresh) the model for a league. Cheap to call often. */
@@ -57,14 +90,19 @@ export async function ensureModel(sport) {
   busy[sport] = true;
   try {
     const y = seasonYear();
-    const [prev, cur] = await Promise.all([season(sport, y - 1, false), season(sport, y, true)]);
+    progress[sport] = { done: 0, total: 0 };
+    // This season first (it's what the board needs), then last season (the starting point).
+    const now = await season(sport, y, true);
+    const before = await season(sport, y - 1, false);
+    const cur = now.games, prev = before.games;
+    if (!cur.length && !prev.length) throw new Error(now.failed + before.failed ? "ESPN didn't send past games. Retrying shortly" : "No past games found");
     const prevEnd = seasonWindow(sport, y - 1).end;
     const prior = prev.length ? fitRatings(prev, { sport, asOf: prevEnd }) : {};
     const model = fitRatings(cur, { sport, asOf: Date.now(), prior });
     // Report card: cached for the day (it replays every week of two seasons).
     const cardKey = `${NS}model.card.${sport}`;
     let cards = load(cardKey, null);
-    const stamp = `${y}-${cur.length}-${prev.length}`;
+    const stamp = `${y}-${cur.length}-${prev.length}-${Math.floor(Date.now() / 864e5)}`;
     if (!cards || cards.stamp !== stamp) {
       const last = prev.length ? backtest(prev, { sport, skipWeeks: 3 }) : null;
       const now = cur.length ? backtest(cur, { sport, prior }) : null;
@@ -73,10 +111,12 @@ export async function ensureModel(sport) {
     }
     const best = cards.all?.bestWeight;
     const weight = best == null ? WEIGHT : Math.min(0.6, Math.max(0.1, best));
-    M[sport] = { model, cards, weight, at: Date.now(), games: { prev: prev.length, cur: cur.length } };
+    const partial = now.failed + before.failed > 0;
+    // Missing weeks: use what loaded now, and try the rest again in a few minutes.
+    M[sport] = { model, cards, weight, at: partial ? Date.now() - 3 * 3600e3 + 5 * 60e3 : Date.now(), games: { prev: prev.length, cur: cur.length }, partial };
     for (const fn of listeners) fn(sport);
   } catch (e) {
-    M[sport] = { error: e.message || "Couldn't load past games", at: Date.now() - 2.5 * 3600e3 }; // retry in ~30 min
+    M[sport] = { error: e.message || "Couldn't load past games", at: Date.now() - 3 * 3600e3 + 2 * 60e3 }; // retry in ~2 min
   } finally {
     busy[sport] = false;
   }
@@ -84,6 +124,12 @@ export async function ensureModel(sport) {
 }
 
 export const modelLoading = (sport) => !!busy[sport];
+
+/** Forget a failed attempt and start again now. */
+export function retryModel(sport) {
+  if (M[sport]?.error) M[sport] = null;
+  return ensureModel(sport);
+}
 
 /** The model's blended view of a game, or null if it has no opinion yet. */
 export function gameView(g) {

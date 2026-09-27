@@ -15,11 +15,12 @@ import { CLOUD, acct, acctSubmit, paintAcct, syncNow } from "./account.js";
 import { refreshDetail, refreshNews, refreshSchedule, refreshToday, switchSport, tick } from "./data.js";
 import { boardGames, selByKey, setSim, slipCalc, slipLegFromSel, toggleSel, trackSlip } from "./market.js";
 import { modelParlay } from "./views/modelui.js";
+import { retryModel } from "./model/index.js";
 import { openSheet, paintDock, render } from "./render.js";
 import { formCalc, newFormLeg, openAdd, paintForm, propHint, saveForm } from "./sheets/add.js";
 import { hedgeText } from "./sheets/bet.js";
 import { handleImage, handleText, importPreview, openDraft } from "./sheets/import.js";
-import { $, $$, NS, S, TABS, fmt, game, num, odds, saveBets, saveSettings, saveSlip, settings, toast } from "./state.js";
+import { $, $$, NS, S, TABS, fmt, game, num, odds, saveBets, saveSettings, saveSlip, settings, sport, toast } from "./state.js";
 import { slipSummary, towinText } from "./views/build.js";
 
 // ───────────────────────────── events ─────────────────────────────
@@ -435,6 +436,10 @@ export const actions = {
   },
   sport: (el) => switchSport(el.dataset.v),
   "model-card": () => openSheet({ kind: "model" }),
+  "model-retry": () => {
+    retryModel(sport());
+    render();
+  },
   "model-parlay": (el) => {
     const picks = modelParlay(boardGames(), Number(el.dataset.v) || 3);
     if (picks.length < 2) return toast("The model doesn't see enough value on the board for a parlay right now", "err");

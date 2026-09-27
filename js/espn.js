@@ -45,8 +45,8 @@ export function scoreboardUrl(dates, sport = "cfb") {
   return `${ROOT}/${sp.path}/scoreboard?dates=${dates}${sp.groups ? `&groups=${sp.groups}` : ""}&limit=500`;
 }
 
-export async function fetchScoreboard(dates, { sport = "cfb" } = {}) {
-  const data = await getJSON(scoreboardUrl(dates, sport));
+export async function fetchScoreboard(dates, { sport = "cfb", timeout } = {}) {
+  const data = await getJSON(scoreboardUrl(dates, sport), timeout ? { timeout } : undefined);
   return (data.events || []).map((ev) => normalizeEvent(ev, sport)).filter(Boolean);
 }
 

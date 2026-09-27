@@ -6,7 +6,7 @@ import { esc } from "../ui.js";
 import { markets } from "../market.js";
 import { closeBtn } from "../render.js";
 import { SP, fmt, game, sport } from "../state.js";
-import { M, gameView, modelLoading, trusted } from "../model/index.js";
+import { M, gameView, modelLoading, modelProgress, trusted } from "../model/index.js";
 import { bestParlay, fairAmerican, legEdge, legProb, parlayCheck } from "../model/edge.js";
 import { leaks } from "../model/leaks.js";
 
@@ -37,13 +37,17 @@ export function edgeTag(sel, g) {
 export function modelBar() {
   const sp = sport();
   const m = M[sp];
-  if (!m || modelLoading(sp)) return `<div class="mbar"><span class="mstat"><span class="spin"></span> Training the ${SP().label} model on last season and this one…</span></div>`;
-  if (m.error) return `<div class="mbar"><span class="mstat muted">Model unavailable: ${esc(m.error)}</span></div>`;
+  if (!m?.model && (modelLoading(sp) || !m)) {
+    const pr = modelProgress(sp);
+    const pct = pr?.total ? Math.round((pr.done / pr.total) * 100) : 0;
+    return `<div class="mbar"><span class="mstat"><span class="spin"></span> ${pr?.total ? `Loading past ${SP().label} games for the model: ${pr.done} of ${pr.total} weeks` : `Getting the ${SP().label} model ready`}…</span>${pr?.total ? `<span class="mprog"><i style="width:${pct}%"></i></span>` : ""}<small class="muted">One time only. After this it's saved on this device.</small></div>`;
+  }
+  if (m.error) return `<div class="mbar"><span class="mstat muted">Model: ${esc(m.error)}</span><button class="chip" data-act="model-retry">Try again</button></div>`;
   const card = m.cards?.all;
   const n = (m.games?.prev || 0) + (m.games?.cur || 0);
   const t = card?.trusted;
   return `<div class="mbar">
-    <button class="mstat" data-act="model-card"><b>hedgehog model</b> · ${n.toLocaleString()} games · <span class="${t ? "good" : "warn"}">${t ? "beating the close" : "not proven yet"}</span> <u>Report card</u></button>
+    <button class="mstat" data-act="model-card"><b>hedgehog model</b> · ${n.toLocaleString()} games${m.partial ? ` <span class="muted">(${modelLoading(sp) ? "loading more" : "some weeks missing, retrying"})</span>` : ""} · <span class="${t ? "good" : "warn"}">${t ? "beating the close" : "not proven yet"}</span> <u>Report card</u></button>
     <span class="grow"></span>
     <span class="mparlay"><small>Model parlay</small>${[2, 3, 4].map((k) => `<button class="chip" data-act="model-parlay" data-v="${k}">${k} legs</button>`).join("")}</span>
   </div>`;

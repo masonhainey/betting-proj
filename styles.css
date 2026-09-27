@@ -1116,3 +1116,6 @@ code { font-size: 12.5px; background: var(--card3); padding: 1px 5px; border-rad
 .lk-r { display: grid; grid-template-columns: 1fr auto auto; gap: 10px; padding: 6px 0; border-bottom: 1px solid var(--line); font-size: 13px; }
 .lk-r .good { color: var(--win); }
 .lk-r .bad { color: var(--red); }
+.mprog { flex: 1 1 120px; max-width: 220px; height: 5px; border-radius: 3px; background: color-mix(in srgb, var(--accent) 18%, transparent); overflow: hidden; }
+.mprog i { display: block; height: 100%; background: var(--accent); border-radius: 3px; transition: width 0.4s; }
+.mbar > small { flex-basis: 100%; font-size: 11.5px; }
