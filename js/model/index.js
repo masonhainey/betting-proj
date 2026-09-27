@@ -29,6 +29,8 @@ const compact = (g) => ({
 });
 
 const WEEK = 7 * 864e5;
+const ranges = { ok: 0, fail: 0, broken: false }; // does ESPN accept week-long date ranges?
+let lastError = "";
 const progress = {}; // sport → { done, total }
 export const modelProgress = (sport) => progress[sport];
 
@@ -67,16 +69,38 @@ async function season(sport, year, current) {
       save(key, { games: [...byId.values()], done: c.done, at: Date.now(), complete: !current && today > end && c.done.length >= weeks.length });
     } catch {} // storage full: still works this session
   };
+  const keep = (got) => {
+    for (const g of got) if (g.state === "post" && g.completed && Number.isFinite(g.home.score)) byId.set(g.id, compact(g));
+  };
   await pool(todo, 3, async (t) => {
     const a = new Date(t), b = new Date(Math.min(t + 6 * 864e5, last));
-    try {
-      const got = await src().fetchScoreboard(`${ymd(a)}-${ymd(b)}`, { sport, timeout: 30000 });
-      for (const g of got) if (g.state === "post" && g.completed && Number.isFinite(g.home.score)) byId.set(g.id, compact(g));
-      if (b.getTime() < recent) c.done.push(ymd(a));
-      persist();
-    } catch {
-      failed++;
+    let ok = false;
+    // A whole week in one request when ESPN allows it; otherwise one request per day
+    // (the same fallback the Upcoming tab uses).
+    if (!ranges.broken) {
+      try {
+        keep(await src().fetchScoreboard(`${ymd(a)}-${ymd(b)}`, { sport, timeout: 30000 }));
+        ok = true;
+        ranges.ok++;
+      } catch (e) {
+        lastError = e.message || String(e);
+        if (++ranges.fail >= 2 && !ranges.ok) ranges.broken = true;
+      }
     }
+    if (!ok) {
+      ok = true;
+      for (let d = new Date(a); d <= b; d = new Date(d.getTime() + 864e5)) {
+        try {
+          keep(await src().fetchScoreboard(ymd(d), { sport, timeout: 20000 }));
+        } catch (e) {
+          ok = false;
+          lastError = e.message || String(e);
+        }
+      }
+    }
+    if (ok && b.getTime() < recent) c.done.push(ymd(a));
+    if (!ok) failed++;
+    persist();
     p.done++;
     for (const fn of listeners) fn(sport, "progress");
   });
@@ -95,7 +119,7 @@ export async function ensureModel(sport) {
     const now = await season(sport, y, true);
     const before = await season(sport, y - 1, false);
     const cur = now.games, prev = before.games;
-    if (!cur.length && !prev.length) throw new Error(now.failed + before.failed ? "ESPN didn't send past games. Retrying shortly" : "No past games found");
+    if (!cur.length && !prev.length) throw new Error(now.failed + before.failed ? `ESPN didn't send past games (${lastError || "no response"}). Retrying shortly` : "No past games found");
     const prevEnd = seasonWindow(sport, y - 1).end;
     const prior = prev.length ? fitRatings(prev, { sport, asOf: prevEnd }) : {};
     const model = fitRatings(cur, { sport, asOf: Date.now(), prior });
