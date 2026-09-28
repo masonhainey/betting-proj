@@ -9,12 +9,15 @@ import { S, game } from "../state.js";
 import { fieldDetail, fieldGraphic } from "../fieldview.js";
 import { betCard } from "../views/bets.js";
 import { fmtA, newsCard, spreadTxt } from "../views/news.js";
+import { gameModel } from "../views/modelui.js";
+import { ensureModel } from "../model/index.js";
 
 // ───────────────────────────── sheets ─────────────────────────────
 
 export function sheetGame() {
   const g = game(S.sheet.id);
   if (!g) return `<div class="sheet-h"><h2>Game</h2>${closeBtn()}</div><p class="muted">Game not found.</p>`;
+  if (g.state === "pre") ensureModel(g.sport || "cfb");
   const m = markets(g);
   const L = S.lines[g.id];
   const k = S.kick[g.id];
@@ -37,6 +40,7 @@ export function sheetGame() {
         <span class="mk-t">${logo(g.home, 20)}${esc(g.home.abbr)}</span>${selBtn(m.spreadHome, fmtLine(m.spreadHome?.line))}${selBtn(m.under, m.under ? `U ${m.under.line}` : "")}${selBtn(m.mlHome, "")}
       </div>
       ${fair ? `<p class="muted small">No-vig win chance: ${esc(g.away.abbr)} ${fmtPct(fair.p2, 0)} · ${esc(g.home.abbr)} ${fmtPct(fair.p1, 0)} · book hold ${fmtPct(fair.hold)}</p>` : ""}` : g.odds ? `<p class="muted">Line at close: ${lineSummary(g)}</p>` : ""}
+    ${gameModel(g)}
     ${L && (L.moves?.length || L.fa < L.la) ? `<h3 class="sh3">Line history</h3><ul class="hist">
       <li><span class="muted">First seen ${esc(ago(L.fa))}</span> ${esc(snapTxt(g, L.first))}</li>
       ${(L.moves || []).map((mv) => `<li><span class="muted">${esc(ago(mv.at))}</span> ${esc(snapTxt(g, mv.to))}</li>`).join("")}

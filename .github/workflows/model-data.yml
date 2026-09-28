@@ -1,0 +1,36 @@
+name: Model data
+
+# Rebuilds data/model-cfb.json and data/model-nfl.json (team ratings, report card, rest and
+# form) from ESPN results, and commits them so the site can load them. Browsers can't pull
+# two seasons of past scoreboards from ESPN reliably; GitHub's servers can.
+on:
+  schedule:
+    - cron: "41 */3 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: model-data
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - run: node scripts/model-data.mjs
+      - name: Commit updated model files
+        run: |
+          git add data
+          if git diff --cached --quiet; then echo "No changes"; exit 0; fi
+          git config user.name "hedgehog-bot"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Update model data"
+          for i in 1 2 3; do git pull --rebase --autostash && git push && exit 0; sleep 5; done
+          exit 1

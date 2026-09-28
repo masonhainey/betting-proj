@@ -18,7 +18,9 @@ test("reads the current drive, its latest plays and win probability", () => {
 });
 
 test("missing pieces come back empty, never throw", () => {
-  assert.deepEqual(parseSummary({}), { box: { players: [], final: false }, drive: null, winProb: null });
+  const empty = parseSummary({});
+  assert.deepEqual({ ...empty, pre: undefined }, { box: { players: [], final: false }, drive: null, winProb: null, pre: undefined });
+  assert.deepEqual(empty.pre.injuries, {});
   assert.equal(parseSummary({ winprobability: [{ homeWinPercentage: "x" }] }).winProb, null);
   assert.deepEqual(parseSummary({ drives: { current: { plays: [{}] } } }).drive.plays, []);
 });

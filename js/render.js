@@ -10,6 +10,7 @@ import { sheetAdd } from "./sheets/add.js";
 import { sheetBet } from "./sheets/bet.js";
 import { sheetGame } from "./sheets/game.js";
 import { sheetImport } from "./sheets/import.js";
+import { sheetModel } from "./views/modelui.js";
 import { sheetSettings } from "./sheets/settings.js";
 import { $, $$, fmt, odds, S, settings, sport, swap } from "./state.js";
 import { SPORTS } from "./espn.js";
@@ -46,7 +47,7 @@ export function renderSheet() {
   // Forms render once and update in place; live sheets re-render every refresh.
   if (root.dataset.kind === k && root.dataset.key === (S.sheet.id || "") && ["add", "settings", "import", "share", "group", "groupnew", "join"].includes(k) && !S.sheet.dirty) return;
   S.sheet.dirty = false;
-  const body = { add: sheetAdd, bet: sheetBet, game: sheetGame, settings: sheetSettings, import: sheetImport, share: sheetShare, tail: sheetTail, member: sheetMember, group: sheetGroup, groupnew: sheetGroupNew, join: sheetJoin, slip: () => `<div class="sheet-h"><h2>Bet slip</h2>${closeBtn()}</div>${slipHtml()}` }[k]();
+  const body = { add: sheetAdd, bet: sheetBet, game: sheetGame, model: sheetModel, settings: sheetSettings, import: sheetImport, share: sheetShare, tail: sheetTail, member: sheetMember, group: sheetGroup, groupnew: sheetGroupNew, join: sheetJoin, slip: () => `<div class="sheet-h"><h2>Bet slip</h2>${closeBtn()}</div>${slipHtml()}` }[k]();
   root.dataset.kind = k;
   root.dataset.key = S.sheet.id || "";
   if (root.hidden) {

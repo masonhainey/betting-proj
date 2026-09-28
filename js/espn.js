@@ -92,6 +92,28 @@ export async function fetchSummary(id, { sport = "cfb" } = {}) {
 
 export const fetchBox = async (id, opts) => (await fetchSummary(id, opts)).box;
 
+export { fetchWeather } from "./weather.js";
+
+/**
+ * The model file for a league, built every few hours by a GitHub Action
+ * (scripts/model-data.mjs). Served with the site; GitHub's raw file host is the fallback
+ * while a fresh deploy is still going out.
+ */
+export async function fetchModelData(sport = "cfb") {
+  const urls = [`data/model-${sport}.json`, `https://raw.githubusercontent.com/masonhainey/betting-proj/claude/linewatch-betting-dashboard-jzpldb/data/model-${sport}.json`];
+  let last;
+  for (const u of urls) {
+    try {
+      const res = await fetch(u, { cache: "no-cache", signal: AbortSignal.timeout(20000) });
+      if (!res.ok) throw new Error(res.status === 404 ? "not built yet" : `HTTP ${res.status}`);
+      return await res.json();
+    } catch (e) {
+      last = e;
+    }
+  }
+  throw new Error(`Model data ${last?.message || "unavailable"}`);
+}
+
 export async function fetchNews({ sport = "cfb", limit = 40 } = {}) {
   const data = await getJSON(`${ROOT}/${sportOf(sport).path}/news?limit=${limit}`);
   return (data.articles || []).map(normalizeArticle).filter(Boolean);
@@ -210,6 +232,9 @@ export function normalizeEvent(ev, sport = "cfb") {
     period: st.period || 0,
     venue: comp.venue?.fullName || "",
     city: [comp.venue?.address?.city, comp.venue?.address?.state].filter(Boolean).join(", "),
+    venueCity: comp.venue?.address?.city || "",
+    venueState: comp.venue?.address?.state || "",
+    indoor: comp.venue?.indoor === true,
     neutral: !!comp.neutralSite,
     tv: (comp.broadcasts || []).flatMap((b) => b.names || []).join(" / ") || comp.broadcast || "",
     notes: comp.notes?.[0]?.headline || "",

@@ -9,6 +9,7 @@ import { CLOUD, syncNow } from "./account.js";
 import { loadCache, tick } from "./data.js";
 import { handleAuthLink } from "./events.js";
 import { render } from "./render.js";
+import { onModel } from "./model/index.js";
 import { $, BOOKS, S, TABS } from "./state.js";
 
 // ───────────────────────────── boot ─────────────────────────────
@@ -32,10 +33,11 @@ function boot() {
   }
   if (alertsOn() && cloud.currentUser()) subscribePush();
   tick(true);
-  // The team-ratings model was removed; clear the past-games data it saved on this device.
+  // Past-games data the old in-browser model saved on this device (the model now loads a prebuilt file).
   try {
-    for (const k of Object.keys(localStorage)) if (/^lw\.(demo\.)?model\./.test(k)) localStorage.removeItem(k);
+    for (const k of Object.keys(localStorage)) if (/^lw\.(demo\.)?model\.(cfb|nfl|card)\./.test(k)) localStorage.removeItem(k);
   } catch {}
+  onModel(() => render()); // model file or live news arrived: show the numbers
   setInterval(tick, 5000);
   // Installed-app support (Add to Home Screen): offline shell + faster launches.
   if ("serviceWorker" in navigator && (location.protocol === "https:" || location.hostname === "localhost")) {

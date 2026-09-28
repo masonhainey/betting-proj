@@ -13,12 +13,13 @@ import * as cloud from "./cloud.js";
 import { load, uid } from "./store.js";
 import { CLOUD, acct, acctSubmit, paintAcct, syncNow } from "./account.js";
 import { refreshDetail, refreshNews, refreshSchedule, refreshToday, switchSport, tick } from "./data.js";
-import { selByKey, setSim, slipCalc, slipLegFromSel, toggleSel, trackSlip } from "./market.js";
+import { boardGames, selByKey, setSim, slipCalc, slipLegFromSel, toggleSel, trackSlip } from "./market.js";
+import { M, ensureModel, markSeen, suggest } from "./model/index.js";
 import { openSheet, paintDock, render } from "./render.js";
 import { formCalc, newFormLeg, openAdd, paintForm, propHint, saveForm } from "./sheets/add.js";
 import { hedgeText } from "./sheets/bet.js";
 import { handleImage, handleText, importPreview, openDraft } from "./sheets/import.js";
-import { $, $$, NS, S, TABS, fmt, game, num, odds, saveBets, saveSettings, saveSlip, settings, toast } from "./state.js";
+import { $, $$, NS, S, TABS, fmt, game, num, odds, saveBets, saveSettings, saveSlip, settings, sport, toast } from "./state.js";
 import { slipSummary, towinText } from "./views/build.js";
 
 // ───────────────────────────── events ─────────────────────────────
@@ -433,6 +434,61 @@ export const actions = {
     paintAlerts();
   },
   sport: (el) => switchSport(el.dataset.v),
+  "model-card": () => openSheet({ kind: "model" }),
+  "model-retry": () => {
+    const sp = sport();
+    if (M[sp]) M[sp].at = 0;
+    ensureModel(sp);
+    render();
+  },
+  "model-picks": async (el) => {
+    const n = Number(el.dataset.v) || 3;
+    const sp = sport();
+    const run = Date.now();
+    S.picks = { status: "loading", n, sport: sp, run };
+    render();
+    try {
+      const result = await suggest(boardGames(), n, sp, {
+        onProgress: (done, total) => {
+          if (S.picks?.run !== run) return;
+          S.picks.progress = { done, total };
+          render();
+        },
+      });
+      if (S.picks?.run !== run) return;
+      S.picks = { status: "ready", n, sport: sp, run, result };
+    } catch (e) {
+      if (S.picks?.run !== run) return;
+      S.picks = { status: "error", n, sport: sp, run, error: e.message || "Model unavailable" };
+    }
+    render();
+  },
+  "model-picks-close": () => {
+    S.picks = null;
+    render();
+  },
+  "model-picks-add": () => {
+    const r = S.picks?.result;
+    if (!r?.legs?.length) return;
+    const legs = r.legs.map((p) => selByKey(p.key)).filter(Boolean);
+    if (legs.length < r.legs.length) return toast("A line moved off the board. Ask for new picks", "err");
+    S.slip.legs = legs.map(slipLegFromSel);
+    S.slip.mode = "parlay";
+    S.slip.modeTouched = true;
+    saveSlip();
+    markSeen(r.sport, r.legs.flatMap((p) => { const g = game(p.gameId); return g ? [g.home.id, g.away.id] : []; }));
+    toast(`Added ${legs.length} legs. Next picks will use different teams`);
+    if (S.sheet?.kind !== "slip" && window.innerWidth < 860) openSheet({ kind: "slip" });
+    render();
+  },
+  "model-swap": (el) => {
+    const i = S.slip.legs.findIndex((l) => l.id === el.dataset.from);
+    const s = selByKey(el.dataset.key);
+    if (i < 0 || !s) return;
+    S.slip.legs[i] = slipLegFromSel(s);
+    saveSlip();
+    render();
+  },
   "widget-copy": async () => {
     const site = location.origin + location.pathname.replace(/[^/]*$/, "");
     const ok = await copy(installerCode(site));

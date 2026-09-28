@@ -2,6 +2,7 @@
 // score, the current drive and its latest plays, and live win probability. Pure — tested.
 
 import { parseBox } from "./props.js";
+import { parsePregame } from "./model/live.js";
 
 export function parseSummary(s) {
   const box = parseBox(s);
@@ -26,5 +27,5 @@ export function parseSummary(s) {
   const home = Number(wp?.homeWinPercentage);
   const tie = Number(wp?.tiePercentage) || 0;
   const winProb = Number.isFinite(home) && home >= 0 && home <= 1 ? { home, away: Math.max(0, 1 - home - tie) } : null;
-  return { box, drive, winProb };
+  return { box, drive, winProb, pre: parsePregame(s) };
 }

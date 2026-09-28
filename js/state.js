@@ -34,6 +34,7 @@ export const S = {
   lastPrices: {},
   moves: {},
   confirmDelete: null,
+  picks: null, // Coach's picks panel
 };
 
 export const src = () => (settings.demo ? demo : espn);

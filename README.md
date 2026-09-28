@@ -76,6 +76,25 @@ A lost parlay's detail view also names the leg or legs that sank it.
 
 **Ticket payout.** Books don't always pay exactly what the leg odds multiply to. They round each leg's price, price same-game parlays with their own correlation math, and prices can move between building a slip and placing it. Enter the payout printed on your ticket, either when adding the bet or later from the bet's detail view. hedgehog will use that number and show how far off the leg math was.
 
+## hedgehog model and Coach's picks
+
+On the Build tab: a model line under every game, value tags on prices, a "Model check" in the slip,
+and **Coach's picks** (2, 3 or 4 legs). Every leg shows **why**: each signal and whether it pushes for
+or against the pick, plus what the model can't see. "New picks" always brings different teams.
+
+- **Ratings** from every result this season (last season as the starting point). Built every 3 hours
+  by the `Model data` GitHub Action (`scripts/model-data.mjs` → `data/model-<league>.json`), because
+  browsers can't reliably pull two seasons of past scoreboards from ESPN. Run it by hand from the
+  Actions tab (Model data → Run workflow) after the first deploy.
+- **Live, per game** when you ask for picks or open a game: ESPN's injury report (a starting QB out is
+  worth ~5.5 NFL / 6.5 college points, key skill players ~1, others capped), ESPN's matchup predictor,
+  the kickoff forecast from Open-Meteo (wind, rain/snow, cold take points off totals; domes skipped),
+  and rest (bye vs short week).
+- **Hard stops:** no picks on a side whose starting QB is out or doubtful, none in games where his
+  status is a coin flip, no overs into 18+ mph wind.
+- The **report card** replays the ratings week by week against closing lines. Until they clear 53.5%
+  on strong disagreements over 60+ games, edges are labeled "leans", not "value".
+
 ## Where your money goes
 
 Bets → Insights breaks your settled bets down by structure (straights, 2-leg and 3+ leg parlays), market and price. It shows:

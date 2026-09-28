@@ -3,7 +3,7 @@ const browser = Object.fromEntries(
   ["window", "document", "navigator", "location", "history", "localStorage", "sessionStorage", "fetch", "setTimeout", "clearTimeout",
    "setInterval", "clearInterval", "console", "URL", "URLSearchParams", "Blob", "FileReader", "Image", "matchMedia", "getComputedStyle",
    "CSS", "Intl", "DataTransfer", "ClipboardEvent", "Event", "Notification", "caches", "self", "structuredClone", "createImageBitmap",
-   "AbortController", "Request", "Response", "requestAnimationFrame", "TextEncoder", "TextDecoder", "btoa", "atob", "File", "Path2D"].map((k) => [k, "readonly"])
+   "AbortController", "AbortSignal", "Request", "Response", "requestAnimationFrame", "TextEncoder", "TextDecoder", "btoa", "atob", "File", "Path2D"].map((k) => [k, "readonly"])
 );
 
 export default [
@@ -18,7 +18,7 @@ export default [
   { files: ["sw.js"], languageOptions: { sourceType: "script" } },
   {
     files: ["scripts/**/*.mjs"],
-    languageOptions: { ecmaVersion: 2024, sourceType: "module", globals: { process: "readonly", console: "readonly", fetch: "readonly", Intl: "readonly", URL: "readonly", setTimeout: "readonly", clearTimeout: "readonly", AbortController: "readonly" } },
+    languageOptions: { ecmaVersion: 2024, sourceType: "module", globals: { process: "readonly", console: "readonly", fetch: "readonly", Intl: "readonly", URL: "readonly", setTimeout: "readonly", clearTimeout: "readonly", AbortController: "readonly", AbortSignal: "readonly" } },
     rules: { "no-undef": "error", "no-unused-vars": ["error", { args: "none", caughtErrors: "none" }] },
   },
   {

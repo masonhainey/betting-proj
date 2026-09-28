@@ -5,6 +5,7 @@
 
 import { normalizeEvent, addDays, ymd } from "./espn.js";
 import { parseSummary } from "./summary.js";
+import { buildModelData, compact, finished, seasonWindow, seasonYear } from "./model/build.js";
 
 const TEAMS = [
   // id, abbr, short, full, color, alt, rating
@@ -337,10 +338,68 @@ export async function fetchSummary(id, { sport = "cfb" } = {}) {
       plays: d.log.map((p, i) => ({ text: p.text, type: { text: p.type }, statYardage: p.yards, scoringPlay: !!p.scoring, period: { number: st.period }, clock: { displayValue: st.displayClock && i === d.log.length - 1 ? st.displayClock : "" } })),
     } } : undefined,
     winprobability: st.type.state === "pre" ? [] : [{ homeWinPercentage: Math.round(pHome * 1000) / 1000, tiePercentage: 0 }],
+    ...(st.type.state === "pre" ? demoPregame(g) : {}),
   });
 }
 
 export const fetchBox = async (id, opts) => (await fetchSummary(id, opts)).box;
+
+/** Pregame injury report, leaders and matchup predictor, shaped like ESPN's summary. */
+function demoPregame(g) {
+  const r = rng(g.seed + 991);
+  const ath = (p, pos) => ({ id: p.id, displayName: p.name, shortName: `${p.name[0]}. ${p.name.split(" ")[1]}`, position: { abbreviation: pos } });
+  const recent = new Date(Date.now() - 3 * 864e5).toISOString();
+  const injuries = [g.home, g.away].map((t) => {
+    const ros = demoRoster(t[0], g.sport);
+    const list = [];
+    const q = r();
+    if (q < 0.1) list.push({ status: "Out", athlete: ath(ros.QB, "QB"), details: { type: "Shoulder" }, date: recent });
+    else if (q < 0.16) list.push({ status: "Questionable", athlete: ath(ros.QB, "QB"), details: { type: "Ankle" }, date: recent });
+    if (r() < 0.3) list.push({ status: r() < 0.5 ? "Out" : "Questionable", athlete: ath(ros.WR1, "WR"), details: { type: "Hamstring" }, date: recent });
+    if (r() < 0.35) list.push({ status: "Out", athlete: { id: `${t[0]}-lb`, displayName: `${["Marcus", "Jalen", "Trey"][Math.floor(r() * 3)]} Hill`, position: { abbreviation: "LB" } }, details: { type: "Knee" }, date: recent });
+    return { team: { id: String(t[0]) }, injuries: list };
+  });
+  const leaders = [g.home, g.away].map((t) => {
+    const ros = demoRoster(t[0], g.sport);
+    const cat = (name, p) => ({ name, leaders: [{ athlete: { id: p.id, displayName: p.name } }] });
+    return { team: { id: String(t[0]) }, leaders: [cat("passingYards", ros.QB), cat("rushingYards", ros.RB), cat("receivingYards", ros.WR1)] };
+  });
+  const ph = 1 / (1 + Math.exp(-((g.home[6] - g.away[6] + 3) / 8 + (r() - 0.5) * 0.6)));
+  return {
+    injuries,
+    leaders,
+    predictor: { header: "Matchup Predictor", homeTeam: { id: String(g.home[0]), gameProjection: (ph * 100).toFixed(1) }, awayTeam: { id: String(g.away[0]), gameProjection: ((1 - ph) * 100).toFixed(1) } },
+  };
+}
+
+/** Kickoff weather, made up but stable per game (some domes, some wind). */
+export async function fetchWeather(g) {
+  const r = rng(hash(String(g.id) + "wx"));
+  if (r() < 0.2) return { indoor: true };
+  const wind = 3 + r() * 17 + (r() < 0.15 ? 10 : 0);
+  const pop = r() < 0.2 ? 60 + r() * 35 : r() * 30;
+  return { wind, gust: wind + r() * 10, temp: 38 + r() * 45, pop, precip: pop > 55 ? 0.8 + r() * 3 : 0, indoor: false };
+}
+
+/** Demo model file: two seasons of generated results through the same builder the Action uses. */
+export async function fetchModelData(sport = "cfb") {
+  await new Promise((r) => setTimeout(r, 200));
+  const y = seasonYear();
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const season = (year) => {
+    const { start, end } = seasonWindow(sport, year);
+    const out = [];
+    for (let d = new Date(start); d < end && d < today; d = addDays(d, 1)) {
+      for (const g of slateFor(d, sport)) {
+        const n = normalizeEvent(eventFor(g), sport);
+        if (n && finished(n)) out.push(compact(n));
+      }
+    }
+    return out;
+  };
+  return buildModelData(sport, { cur: season(y), prev: season(y - 1), season: y });
+}
 
 const fmtA = (n) => (n > 0 ? `+${n}` : `${n}`);
 const fmtL = (n) => (n > 0 ? `+${n}` : `${n}`);
