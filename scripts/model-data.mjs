@@ -6,7 +6,7 @@
 // fetches the last couple of weeks (scores and closing lines settle) plus anything missing.
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { normalizeEvent, scoreboardUrl, ymd } from "../js/espn.js";
+import { normalizeEvent, normalizeOdds, scoreboardUrl, sportOf, ymd } from "../js/espn.js";
 import { buildModelData, compact, finished, seasonWindow, seasonYear } from "../js/model/build.js";
 
 const DIR = new URL("../data/", import.meta.url);
@@ -42,6 +42,37 @@ async function fetchWeek(sport, from, to) {
   }
 }
 
+/**
+ * ESPN drops odds from the scoreboard once a game is final, but the game summary keeps the
+ * book's last line (pickcenter). Backfill closing lines for games that don't have one yet;
+ * games with no line at all are marked so they aren't asked for again.
+ */
+async function backfillLines(sport, games, max = 2500) {
+  const todo = games.filter((g) => g.sp == null && g.tot == null && !g.nl).slice(0, max);
+  let got = 0;
+  const q = [...todo];
+  await Promise.all(Array.from({ length: 6 }, async () => {
+    while (q.length) {
+      const g = q.shift();
+      try {
+        const s = await getJSON(`https://site.api.espn.com/apis/site/v2/sports/football/${sportOf(sport).path}/summary?event=${g.id}`, 2);
+        const comps = s?.header?.competitions?.[0]?.competitors || [];
+        const side = (h) => ({ abbr: comps.find((c) => c.homeAway === h)?.team?.abbreviation || "" });
+        const pc = (s.pickcenter || []).find((o) => o.spread != null || o.overUnder != null || o.details) || s.odds?.[0];
+        const o = normalizeOdds(pc, side("home"), side("away"));
+        if (o?.spread?.home?.line != null) g.sp = o.spread.home.line;
+        if (o?.total?.line != null) g.tot = o.total.line;
+        if (g.sp == null && g.tot == null) g.nl = 1;
+        else got++;
+      } catch {
+        // try again next run
+      }
+    }
+  }));
+  if (todo.length) console.log(`${sport}: closing lines for ${got} of ${todo.length} games`);
+  return got;
+}
+
 async function readCache(file) {
   try {
     return JSON.parse(await readFile(new URL(file, DIR), "utf8"));
@@ -54,7 +85,11 @@ async function readCache(file) {
 async function season(sport, year, now) {
   const file = `games-${sport}-${year}.json`;
   const c = (await readCache(file)) || { done: [], games: [] };
-  if (c.complete) return c.games;
+  c.lines ||= {};
+  if (c.complete) {
+    if (await backfillLines(sport, c.games)) await writeFile(new URL(file, DIR), JSON.stringify(c));
+    return c.games;
+  }
   const { start, end } = seasonWindow(sport, year);
   const last = Math.min(end.getTime(), now);
   const byId = new Map(c.games.map((g) => [g.id, g]));
@@ -66,16 +101,42 @@ async function season(sport, year, now) {
     if (done.has(key) && !recent) continue;
     try {
       const gs = await fetchWeek(sport, new Date(t), new Date(Math.min(t + 6 * DAY, last)));
-      for (const g of gs) if (finished(g)) byId.set(g.id, compact(g));
+      for (const g of gs) {
+        // Remember the latest line while a game is upcoming: it becomes the closing line.
+        if (g.state === "pre" && g.odds) c.lines[g.id] = { sp: g.odds.spread?.home?.line ?? null, tot: g.odds.total?.line ?? null };
+        if (!finished(g)) continue;
+        const cg = compact(g);
+        const old = byId.get(g.id);
+        const L = c.lines[g.id];
+        cg.sp ??= L?.sp ?? old?.sp ?? undefined;
+        cg.tot ??= L?.tot ?? old?.tot ?? undefined;
+        if (cg.sp == null) delete cg.sp;
+        if (cg.tot == null) delete cg.tot;
+        if (old?.nl && cg.sp == null && cg.tot == null) cg.nl = 1;
+        byId.set(g.id, cg);
+      }
       if (!recent) done.add(key);
     } catch (e) {
       failed++;
       console.warn(`${sport} ${year} week of ${key}: ${e.message}`);
     }
   }
+  if (now < end.getTime()) {
+    // Next week's games: save their lines now, while ESPN still shows them.
+    try {
+      for (const g of await fetchWeek(sport, utc(new Date(now)), utc(new Date(now + 7 * DAY)))) {
+        if (g.state === "pre" && g.odds) c.lines[g.id] = { sp: g.odds.spread?.home?.line ?? null, tot: g.odds.total?.line ?? null };
+      }
+    } catch (e) {
+      console.warn(`${sport}: upcoming lines: ${e.message}`);
+    }
+  }
   const games = [...byId.values()].sort((a, b) => Date.parse(a.d) - Date.parse(b.d));
+  await backfillLines(sport, games);
   const complete = now > end.getTime() + 7 * DAY && !failed;
-  await writeFile(new URL(file, DIR), JSON.stringify({ sport, year, complete, done: [...done].sort(), games }));
+  const ids = new Set(games.map((g) => g.id));
+  const lines = Object.fromEntries(Object.entries(c.lines).filter(([id]) => !ids.has(id)));
+  await writeFile(new URL(file, DIR), JSON.stringify({ sport, year, complete, done: [...done].sort(), games, lines }));
   console.log(`${sport} ${year}: ${games.length} games${failed ? `, ${failed} weeks failed` : ""}`);
   return games;
 }
