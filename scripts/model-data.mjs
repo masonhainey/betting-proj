@@ -48,13 +48,28 @@ async function fetchWeek(sport, from, to) {
  * games with no line at all are marked so they aren't asked for again.
  */
 async function backfillLines(sport, games, max = 2500) {
-  const todo = games.filter((g) => g.sp == null && g.tot == null && !g.nl).slice(0, max);
+  // nl: 1 = no line in the summary, 2 = not in the odds archive either (never asked again).
+  const todo = games.filter((g) => g.sp == null && g.tot == null && (g.nl || 0) < 2).slice(0, max);
   let got = 0;
   const q = [...todo];
   await Promise.all(Array.from({ length: 6 }, async () => {
     while (q.length) {
       const g = q.shift();
       try {
+        if (g.nl === 1) {
+          // Older games: ESPN's odds archive (core API) often still has the line.
+          const league = sportOf(sport).path;
+          const j = await getJSON(`https://sports.core.api.espn.com/v2/sports/football/leagues/${league}/events/${g.id}/competitions/${g.id}/odds`, 2);
+          const it = (j.items || []).find((o) => o.spread != null || o.overUnder != null);
+          const sp = Number(it?.spread);
+          if (it?.spread != null && Number.isFinite(sp)) {
+            // Home-relative: trust the favorite flags over the sign when ESPN gives them.
+            g.sp = it.homeTeamOdds?.favorite === true ? -Math.abs(sp) : it.awayTeamOdds?.favorite === true ? Math.abs(sp) : sp;
+          }
+          if (it?.overUnder != null && Number.isFinite(Number(it.overUnder))) g.tot = Number(it.overUnder);
+          if (g.sp != null || g.tot != null) { delete g.nl; got++; } else g.nl = 2;
+          continue;
+        }
         const s = await getJSON(`https://site.api.espn.com/apis/site/v2/sports/football/${sportOf(sport).path}/summary?event=${g.id}`, 2);
         const comps = s?.header?.competitions?.[0]?.competitors || [];
         const side = (h) => ({ abbr: comps.find((c) => c.homeAway === h)?.team?.abbreviation || "" });
@@ -64,13 +79,14 @@ async function backfillLines(sport, games, max = 2500) {
         if (o?.total?.line != null) g.tot = o.total.line;
         if (g.sp == null && g.tot == null) g.nl = 1;
         else got++;
-      } catch {
-        // try again next run
+      } catch (e) {
+        // A missing archive entry won't appear later; anything else is retried next run.
+        if (/ESPN 404/.test(e.message) && g.nl === 1) g.nl = 2;
       }
     }
   }));
   if (todo.length) console.log(`${sport}: closing lines for ${got} of ${todo.length} games`);
-  return got;
+  return todo.length;
 }
 
 async function readCache(file) {
@@ -87,7 +103,7 @@ async function season(sport, year, now) {
   const c = (await readCache(file)) || { done: [], games: [] };
   c.lines ||= {};
   if (c.complete) {
-    if (await backfillLines(sport, c.games)) await writeFile(new URL(file, DIR), JSON.stringify(c));
+    if (await backfillLines(sport, c.games)) await writeFile(new URL(file, DIR), JSON.stringify(c)); // new lines or 'no line' marks
     return c.games;
   }
   const { start, end } = seasonWindow(sport, year);
