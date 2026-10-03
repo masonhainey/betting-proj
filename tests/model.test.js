@@ -166,3 +166,10 @@ test("no edges on long shots or big-game moneylines", () => {
   const close = view({ ...pred, margin: -1, pHome: phi(-1 / 13) }, { spread: { home: { line: -3 } } });
   assert.ok(legEdge({ market: "ml", side: "away" }, close, 2.3), "a close game's moneyline is fine");
 });
+
+test("home field stays sane early in the season, even when strong teams host weak ones", () => {
+  // Week-1 style slate: every home team is far better than its visitor.
+  const games = Array.from({ length: 30 }, (_, i) => ({ id: `e${i}`, d: "2026-09-05T18:00:00Z", h: `S${i}`, a: `W${i}`, hs: 52, as: 7, n: false }));
+  const m = fitRatings(games, { sport: "cfb", asOf: Date.parse("2026-09-07T00:00:00Z") });
+  assert.ok(m.hfa >= 1 && m.hfa <= 4, `hfa ${m.hfa}`);
+});

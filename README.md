@@ -92,6 +92,9 @@ or against the pick, plus what the model can't see. "New picks" always brings di
   and rest (bye vs short week).
 - **Hard stops:** no picks on a side whose starting QB is out or doubtful, none in games where his
   status is a coin flip, no overs into 18+ mph wind.
+- **No forced picks:** until the ratings beat closing lines in the week-by-week replay (53.5%+ on
+  3+ point disagreements over 60+ games), Coach's picks says so and shows its leans only on request,
+  labeled unproven.
 - The **report card** replays the ratings week by week against closing lines. Until they clear 53.5%
   on strong disagreements over 60+ games, edges are labeled "leans", not "value".
 

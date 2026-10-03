@@ -10,8 +10,8 @@
 //   { id, d: ISO date, h: home id, a: away id, hs, as, n: neutral, sp?: closing home spread, tot?: closing total }
 
 export const CONFIG = {
-  cfb: { edgeMax: 24, cap: 28, ptsCap: 56, hfa: 2.5, sigma: 15.5, sigmaTotal: 16, regress: 0.55, unknownPrior: -16, halfLife: 110, lambda: 2.5, mu: 28 },
-  nfl: { edgeMax: 17, cap: 21, ptsCap: 45, hfa: 1.8, sigma: 13, sigmaTotal: 12.5, regress: 0.6, unknownPrior: 0, halfLife: 150, lambda: 3, mu: 22 },
+  cfb: { edgeMax: 24, cap: 28, ptsCap: 56, hfa: 2.5, hfaWeight: 400, sigma: 15.5, sigmaTotal: 16, regress: 0.8, unknownPrior: -16, halfLife: 400, lambda: 0.3, lambdaPts: 2.5, mu: 28, marketMix: 0.7 },
+  nfl: { edgeMax: 17, cap: 21, ptsCap: 45, hfa: 1.8, hfaWeight: 400, sigma: 13, sigmaTotal: 12.5, regress: 0.8, unknownPrior: 0, halfLife: 80, lambda: 2.5, lambdaPts: 3, mu: 22, marketMix: 0.4 },
 };
 
 const DAY = 864e5;
@@ -22,12 +22,19 @@ const clamp = (x, c) => (Math.abs(x) <= c ? x : Math.sign(x) * (c + (Math.abs(x)
  * Fit ratings on games before `asOf`.
  * prior: { r, o, d } maps from last season's fit (regressed here), or empty.
  */
-export function fitRatings(games, { sport = "cfb", asOf = Date.now(), prior = {} } = {}) {
-  const C = CONFIG[sport] || CONFIG.cfb;
+export function fitRatings(games, { sport = "cfb", asOf = Date.now(), prior = {}, tune = {} } = {}) {
+  const C = { ...(CONFIG[sport] || CONFIG.cfb), ...tune };
   const t0 = typeof asOf === "number" ? asOf : Date.parse(asOf);
   const gs = games
     .filter((g) => Date.parse(g.d) < t0 && Number.isFinite(g.hs) && Number.isFinite(g.as))
-    .map((g) => ({ ...g, w: Math.pow(0.5, (t0 - Date.parse(g.d)) / DAY / C.halfLife), f: g.n ? 0 : 1 }));
+    .map((g) => ({
+      ...g,
+      w: Math.pow(0.5, (t0 - Date.parse(g.d)) / DAY / C.halfLife),
+      f: g.n ? 0 : 1,
+      // What a game says about the teams: its result, partly corrected toward the closing line
+      // (one fluky result says less than the market's read of both teams).
+      y: Number.isFinite(g.sp) && C.marketMix ? (1 - C.marketMix) * (g.hs - g.as) + C.marketMix * -g.sp : g.hs - g.as,
+    }));
   const byTeam = new Map();
   for (const g of gs) {
     for (const t of [g.h, g.a]) {
@@ -52,16 +59,18 @@ export function fitRatings(games, { sport = "cfb", asOf = Date.now(), prior = {}
     for (const t of teams) {
       let num = C.lambda * p[t], den = C.lambda;
       for (const g of byTeam.get(t)) {
-        const y = clamp(g.hs - g.as, C.cap);
+        const y = clamp(g.y, C.cap);
         if (g.h === t) num += g.w * (y - hfa * g.f + r[g.a]);
         else num += g.w * (r[g.h] + hfa * g.f - y);
         den += g.w;
       }
       r[t] = num / den;
     }
-    let hn = 20 * C.hfa, hd = 20;
-    for (const g of gs) if (g.f) { hn += g.w * (clamp(g.hs - g.as, C.cap) - (r[g.h] - r[g.a])); hd += g.w; }
-    hfa = hn / hd;
+    // Home field is learned only slowly from the data: early in the season, big programs
+    // beating weak teams at home would otherwise read as a huge home edge.
+    let hn = C.hfaWeight * C.hfa, hd = C.hfaWeight;
+    for (const g of gs) if (g.f) { hn += g.w * (clamp(g.y, C.cap) - (r[g.h] - r[g.a])); hd += g.w; }
+    hfa = Math.min(C.hfa + 1.5, Math.max(C.hfa - 1.5, hn / hd));
   }
   // Points: offense/defense, for totals.
   const o = { ...po }, d = { ...pd };
@@ -75,7 +84,7 @@ export function fitRatings(games, { sport = "cfb", asOf = Date.now(), prior = {}
     }
     mu = mn / md;
     for (const t of teams) {
-      let on = C.lambda * po[t], dn = C.lambda * pd[t], den = C.lambda;
+      let on = C.lambdaPts * po[t], dn = C.lambdaPts * pd[t], den = C.lambdaPts;
       for (const g of byTeam.get(t)) {
         const home = g.h === t;
         const scored = cap(home ? g.hs : g.as), allowed = cap(home ? g.as : g.hs);

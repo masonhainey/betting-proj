@@ -445,7 +445,8 @@ export const actions = {
     const n = Number(el.dataset.v) || 3;
     const sp = sport();
     const run = Date.now();
-    S.picks = { status: "loading", n, sport: sp, run };
+    const showLeans = !!S.picks?.showLeans;
+    S.picks = { status: "loading", n, sport: sp, run, showLeans };
     render();
     try {
       const result = await suggest(boardGames(), n, sp, {
@@ -456,11 +457,16 @@ export const actions = {
         },
       });
       if (S.picks?.run !== run) return;
-      S.picks = { status: "ready", n, sport: sp, run, result };
+      S.picks = { status: "ready", n, sport: sp, run, result, showLeans };
     } catch (e) {
       if (S.picks?.run !== run) return;
-      S.picks = { status: "error", n, sport: sp, run, error: e.message || "Model unavailable" };
+      S.picks = { status: "error", n, sport: sp, run, showLeans, error: e.message || "Model unavailable" };
     }
+    render();
+  },
+  "model-leans": () => {
+    if (!S.picks) return;
+    S.picks.showLeans = true;
     render();
   },
   "model-picks-close": () => {

@@ -1178,3 +1178,5 @@ code { font-size: 12.5px; background: var(--card3); padding: 1px 5px; border-rad
 .gm-bh small { color: var(--muted); }
 .sh3 .spin { width: 10px; height: 10px; vertical-align: -1px; }
 .rc-how { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.5; color: var(--text); display: flex; flex-direction: column; gap: 6px; }
+.pk-honest { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text); }
+.pk-honest b { color: var(--amber); }

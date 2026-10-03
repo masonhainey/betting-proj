@@ -95,6 +95,17 @@ export function picksPanel() {
   if (!r?.legs?.length || r.legs.length < 2) {
     return `<div class="picks card">${head()}<p class="muted">The model doesn't see ${P.n} value legs on the board right now${r?.vetoed?.length ? ` (skipped: ${esc(r.vetoed.map((v) => `${v.name}, ${v.why}`).join("; "))})` : ""}. Lines move, so check again later.</p></div>`;
   }
+  const proven = trusted(P.sport);
+  if (!proven && !P.showLeans) {
+    const c = M[P.sport]?.cards || {};
+    const rec = (x) => (x?.atsStrong ? `${x.atsStrong.w}-${x.atsStrong.l}` : "—");
+    return `<div class="picks card">
+      <div class="pk-h"><div><div class="eyebrow">Coach's picks</div><h3>No bets from the model</h3></div><button class="icon-btn" data-act="model-picks-close" aria-label="Close">×</button></div>
+      <p class="pk-honest">When the model disagrees with the line by 3+ points, its side has gone <b>${rec(c.now)}</b> this season and <b>${rec(c.all)}</b> over two seasons. Break-even is 52.4%. Until it clears that over a real sample, it won't hand you picks.</p>
+      <p class="pk-note">What still helps: the injury, QB, weather and rest flags on the board and in your slip, and shopping for the best price.</p>
+      <div class="pk-act"><button class="btn sm ghost" data-act="model-leans">Show its leans anyway (unproven)</button></div>
+    </div>`;
+  }
   const payout = r.odds;
   const legs = r.legs.map((l, i) => {
     const g = game(l.gameId);
@@ -111,16 +122,16 @@ export function picksPanel() {
   }).join("");
   const stake = 10;
   return `<div class="picks card">
-    ${head(`${r.checked} games checked for injuries, QBs and weather${r.recycled ? " · ran out of new teams, starting the rotation over" : ""}`)}
+    ${head(`${proven ? "" : "Unproven leans, not bets · "}${r.checked} games checked for injuries, QBs and weather${r.recycled ? " · ran out of new teams, starting the rotation over" : ""}`)}
     <div class="pk-legs">${legs}</div>
     <div class="pk-sum">
       <span>Real chance it hits <b>${fmtPct(r.p, 1)}</b><small>fair ${esc(fmtA(fairAmerican(r.p)))} · pays ${odds(payout)}</small></span>
-      <span class="${r.ev >= 0 ? "good" : "bad"}">${r.ev >= 0 ? "+" : ""}${fmtMoney(r.ev * stake)}<small>expected per $${stake}</small></span>
+      ${proven ? `<span class="${r.ev >= 0 ? "good" : "bad"}">${r.ev >= 0 ? "+" : ""}${fmtMoney(r.ev * stake)}<small>expected per $${stake}</small></span>` : `<span class="muted">model's estimate<small>unproven: the line has been right more often</small></span>`}
     </div>
     ${r.vetoed?.length ? `<p class="pk-veto">Skipped on live news: ${esc(r.vetoed.map((v) => `${v.name} (${v.why})`).join(" · "))}</p>` : ""}
     <p class="pk-note">Parlays multiply the book's cut. Even +EV parlays lose most of the time; stake small.</p>
     <div class="pk-act">
-      <button class="btn sm" data-act="model-picks-add">Add to slip</button>
+      <button class="btn sm ${proven ? "" : "ghost"}" data-act="model-picks-add">Add to slip</button>
       <button class="btn sm ghost" data-act="model-picks" data-v="${P.n}">New picks, different teams</button>
     </div>
   </div>`;
