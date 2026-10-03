@@ -1,7 +1,7 @@
 // Offline shell for the installed app. Network-first (and revalidated) for our own files
 // so updates show up on the next launch; the cache only answers when there's no connection. ESPN, fonts and
 // the OCR library always go straight to the network.
-const CACHE = "hedgehog-v23";
+const CACHE = "hedgehog-v24";
 const SHELL = [
   "./", "index.html", "styles.css", "manifest.webmanifest", "js/account.js", "js/autopsy.js", "js/app.js",
   "js/cloud.js", "js/config.js", "js/data.js", "js/demo.js", "js/espn.js", "js/events.js",

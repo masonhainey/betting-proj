@@ -570,6 +570,15 @@ export const inputs = {
     saveSlip();
     paintSlipCalc();
   },
+  "slip-game": (el) => {
+    const l = S.slip.legs.find((x) => x.id === el.dataset.id);
+    const g = game(el.value);
+    if (!l) return;
+    if (g) Object.assign(l, { gameId: g.id, gameLabel: g.shortName, kickoff: g.date, sport: g.sport || "cfb" });
+    else for (const k of ["gameId", "gameLabel", "kickoff", "sport"]) delete l[k];
+    saveSlip();
+    render();
+  },
   "slip-pick": (el) => {
     const l = S.slip.legs.find((x) => x.id === el.dataset.id);
     l.pick = el.value;

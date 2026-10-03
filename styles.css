@@ -1180,3 +1180,4 @@ code { font-size: 12.5px; background: var(--card3); padding: 1px 5px; border-rad
 .rc-how { margin: 6px 0 0; padding-left: 18px; font-size: 13px; line-height: 1.5; color: var(--text); display: flex; flex-direction: column; gap: 6px; }
 .pk-honest { margin: 0; font-size: 14px; line-height: 1.5; color: var(--text); }
 .pk-honest b { color: var(--amber); }
+.sl-game { margin-top: 6px; width: 100%; max-width: 100%; font: inherit; font-size: 12.5px; padding: 6px 8px; border-radius: 9px; border: 1px solid var(--line); background: var(--card2); color: var(--text); }

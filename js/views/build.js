@@ -65,6 +65,25 @@ export function boardRow(g) {
   </div>`;
 }
 
+/** Games a custom pick can be attached to: live ones first, then the next week's. */
+export function linkableGames() {
+  const now = Date.now();
+  return [...S.games.values()]
+    .filter((g) => g.state !== "post" && new Date(g.date) - now < 8 * 864e5)
+    .sort((a, b) => (b.state === "in") - (a.state === "in") || new Date(a.date) - new Date(b.date));
+}
+
+// Linking a game is what lets a custom pick (like a player prop) track live and settle itself.
+function gameSelect(l) {
+  const gs = linkableGames();
+  if (l.gameId && !gs.some((g) => g.id === l.gameId) && game(l.gameId)) gs.unshift(game(l.gameId));
+  const label = (g) => `${g.state === "in" ? "LIVE · " : `${relDay(g.date)} · `}${g.away.short} @ ${g.home.short}`;
+  return `<select class="sl-game" data-in="slip-game" data-id="${l.id}" aria-label="Game for this pick">
+    <option value="">${l.gameId ? "Unlink game" : "Link a game so it tracks live…"}</option>
+    ${gs.map((g) => `<option value="${esc(g.id)}" ${g.id === l.gameId ? "selected" : ""}>${esc(label(g))}</option>`).join("")}
+  </select>`;
+}
+
 export function slipHtml() {
   const c = slipCalc();
   const n = c.legs.length;
@@ -90,7 +109,7 @@ export function slipHtml() {
     return `<div class="sleg ${moved ? "moved" : ""} ${mv ? `mv-${mv.dir}` : ""}">
       <div class="sl-top">
         <div class="sl-pick">${l.custom
-          ? `<input id="slip-pick-${l.id}" data-in="slip-pick" data-id="${l.id}" value="${esc(l.pick)}" placeholder="Name it — e.g. Manning 250+ pass yds" autocomplete="off"><small>Custom selection</small>`
+          ? `<input id="slip-pick-${l.id}" data-in="slip-pick" data-id="${l.id}" value="${esc(l.pick)}" placeholder="Name it — e.g. Maiava 2+ pass TDs" autocomplete="off">${gameSelect(l)}`
           : `${esc(legLabel(l, g) || l.pick)}<small>${esc(`${l.gameLabel} · ${relDay(l.kickoff)} ${fmtTime(l.kickoff)}`)}</small>`}</div>
         <button class="icon-btn sm" data-act="slip-remove" data-id="${l.id}" aria-label="Remove">${icons.x}</button>
       </div>
