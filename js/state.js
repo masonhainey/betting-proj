@@ -9,6 +9,12 @@ import { load, save, DEFAULT_SETTINGS } from "./store.js";
 // ───────────────────────────── state ─────────────────────────────
 
 export const settings = { ...DEFAULT_SETTINGS, ...load("settings", {}) };
+// Links like ?demo=1 (the portfolio's "Try it now") open straight into demo mode with made-up bets.
+// Demo data lives under its own "demo." keys, so a real logbook on the same device is left alone.
+if (new URLSearchParams(location.search).has("demo") && !settings.demo) {
+  settings.demo = true;
+  save("settings", settings);
+}
 export const NS = settings.demo ? "demo." : "";
 export const TABS = ["bets", "live", "schedule", "build", "friends", "news"];
 export const BOOKS = ["DraftKings", "FanDuel", "BetMGM", "Caesars", "ESPN BET", "Fanatics", "bet365", "Hard Rock", "BetRivers", "Bovada", "Other"];
